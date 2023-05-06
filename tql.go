@@ -3,19 +3,20 @@ package tql
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"log"
 	"reflect"
 	"strconv"
+	"strings"
 	"unicode"
 )
 
 type typeMapper struct {
-	mappings       map[reflect.Type]func(typeName string, field reflect.Value) reflect.Value
 	typeFieldCache map[string]map[string]int
 }
 
 var mapper = typeMapper{
-	mappings:       make(map[reflect.Type]func(string, reflect.Value) reflect.Value),
 	typeFieldCache: make(map[string]map[string]int),
 }
 
@@ -24,15 +25,42 @@ type Querier interface {
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
-func QueryOneNamed[T any](ctx context.Context, q Querier, query string, params ...any) (T, error) {
-	panic("not implemented")
+func QuerySingleOrDefault[T any](ctx context.Context, q Querier, def T, query string, params ...any) (result T, err error) {
+	result, err = QuerySingle[T](ctx, q, query, params)
+	switch {
+	case err != nil && errors.Is(err, sql.ErrNoRows):
+		return def, nil
+	case err != nil:
+		return result, err
+	default:
+		return result, nil
+	}
 }
 
-// TODO:
-// QuerySingle
-// QuerySingleOrDefault
-// QueryFirst
-// QueryFirstOrDefault
+func QuerySingle[T any](ctx context.Context, q Querier, query string, params ...any) (result T, err error) {
+	results, err := Query[T](ctx, q, query, params)
+	if err != nil {
+		return result, err
+	}
+
+	if len(results) > 1 {
+		return result, fmt.Errorf("found more than one result")
+	}
+
+	return result, err
+}
+
+func QueryFirstOrDefault[T any](ctx context.Context, q Querier, def T, query string, params ...any) (result T, err error) {
+	result, err = QueryFirst[T](ctx, q, query, params)
+	switch {
+	case err != nil && errors.Is(err, sql.ErrNoRows):
+		return def, nil
+	case err != nil:
+		return result, err
+	default:
+		return result, nil
+	}
+}
 
 func QueryFirst[T any](ctx context.Context, q Querier, query string, params ...any) (result T, err error) {
 	rows, err := q.QueryContext(ctx, query, params...)
@@ -99,10 +127,6 @@ func QueryFirst[T any](ctx context.Context, q Querier, query string, params ...a
 	}
 
 	return result, err
-}
-
-func QueryNamed[T any](ctx context.Context, q Querier, query string, params ...any) ([]T, error) {
-	panic("not implemented")
 }
 
 func Query[T any](ctx context.Context, q Querier, query string, params ...any) (result []T, err error) {
@@ -177,14 +201,6 @@ type Executor interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 }
 
-type Preparer interface {
-	PrepareContext(ctx context.Context, query string) (*sql.Stmt, error)
-}
-
-func ExecNamed(ctx context.Context, e Executor, query string, params ...any) (sql.Result, error) {
-	panic("not implemented")
-}
-
 func Exec(ctx context.Context, e Executor, query string, params ...any) (sql.Result, error) {
 	parameters := make(map[string]any)
 	for _, p := range params {
@@ -220,7 +236,14 @@ func Exec(ctx context.Context, e Executor, query string, params ...any) (sql.Res
 		}
 	}
 
-	parameterizedQuery, args, err := parameterizeQuery(query, parameters)
+	//driverName := sql.Drivers()[0]
+	driverName := "postgres"
+	pos, nam, err := parameterIndicators(driverName)
+	if err != nil {
+		return nil, err
+	}
+
+	parameterizedQuery, args, err := parameterizeQuery(pos, nam, query, parameters)
 	if err != nil {
 		return nil, err
 	}
@@ -229,8 +252,7 @@ func Exec(ctx context.Context, e Executor, query string, params ...any) (sql.Res
 		args = params
 	}
 
-	//log.Println(parameterizedQuery)
-	//log.Printf("ARGS: %+v\n", args)
+	log.Printf("QUERY: %s\n", parameterizedQuery)
 
 	return e.ExecContext(ctx, parameterizedQuery, args...)
 }
@@ -239,58 +261,117 @@ func isNameChar(c rune) bool {
 	return unicode.IsLetter(c) || unicode.IsNumber(c) || c == '_'
 }
 
-func parameterizeQuery(query string, parameters map[string]any) (string, []any, error) {
-	var (
-		insideName bool
+type indicators struct {
+	named      rune
+	positional rune
+}
 
+var driverIndicators = map[string]indicators{
+	"postgres":         {named: ':', positional: '$'},
+	"pgx":              {named: ':', positional: '$'},
+	"pq-timeouts":      {named: ':', positional: '$'},
+	"cloudsqlpostgres": {named: ':', positional: '$'},
+	"ql":               {named: ':', positional: '$'},
+	"nrpostgres":       {named: ':', positional: '$'},
+	"cockroach":        {named: ':', positional: '$'},
+
+	"mysql":   {named: ':', positional: '?'},
+	"nrmysql": {named: ':', positional: '?'},
+
+	"sqlite3":   {named: ':', positional: '?'},
+	"nrsqlite3": {named: ':', positional: '?'},
+}
+
+//var binds map[string]int = make(map[string]int)
+
+//// Bindvar types supported by Rebind, BindMap and BindStruct.
+//const (
+//	UNKNOWN = iota
+//	QUESTION
+//	DOLLAR
+//	NAMED
+//	AT
+//)
+//
+//var defaultBinds = map[int][]string{
+//	DOLLAR:   {"postgres", "pgx", "pq-timeouts", "cloudsqlpostgres", "ql", "nrpostgres", "cockroach"},
+//	QUESTION: {"mysql", "sqlite3", "nrmysql", "nrsqlite3"},
+//	NAMED:    {"oci8", "ora", "goracle", "godror"},
+//	AT:       {"sqlserver"},
+//}
+
+func parameterIndicators(driverName string) (rune, rune, error) {
+	i, found := driverIndicators[driverName]
+	if !found {
+		return 0, 0, fmt.Errorf("failed to find driver parameter indicator mapping")
+	}
+	return i.named, i.positional, nil
+}
+
+func parameterizeQuery(
+	namedParamIndicator rune,
+	positionalParamIndicator rune,
+	query string,
+	parameters map[string]any,
+) (string, []any, error) {
+	var (
+		insideName    bool
 		hasPositional bool
 
-		result     string
-		resultArgs []any
+		result     strings.Builder
+		resultArgs = make([]any, len(parameters))
 
-		currentName string
+		currentName strings.Builder
 		currentNum  int
 	)
+
+	result.Grow(len(query))
+
+	// TODO: inside name has to know the connection type to
+	// properly decide on which token to use as the namedIndicator
+	// of a parameter inside a query.
+	// Also, which token to remap to.
+
 	for _, c := range query {
-		if !hasPositional && c == '$' {
+		if !hasPositional && c == positionalParamIndicator {
 			hasPositional = true
 		}
 
-		if !insideName && c == ':' {
+		if !insideName && c == namedParamIndicator {
+			currentName.Reset()
 			insideName = true
-			//result += string(c)
 			continue
 		}
 
 		if insideName && !isNameChar(c) {
-			arg, found := parameters[currentName]
+			arg, found := parameters[currentName.String()]
 			if !found {
-				return "", []any{}, fmt.Errorf("query parameter '%s' not found in provided parameters", currentName)
+				return "", []any{}, fmt.Errorf("query parameter '%s' not found in provided parameters", currentName.String())
 			}
-			resultArgs = append(resultArgs, arg)
+			resultArgs[currentNum] = arg
 
 			insideName = false
-			currentName = ""
 			currentNum++
 
-			result += fmt.Sprintf("$%s%c", strconv.Itoa(currentNum), c)
+			result.WriteRune(positionalParamIndicator)
+			result.Write([]byte(strconv.Itoa(currentNum)))
+			result.WriteRune(c)
 			continue
 		}
 
 		if insideName {
-			// #horribleways
-			currentName += string(c)
+			currentName.WriteRune(c)
 			continue
 		}
 
-		result += string(c)
+		result.WriteRune(c)
 	}
 
 	if hasPositional && len(resultArgs) > 0 {
 		return "", []any{}, fmt.Errorf("mixed positional and named parameters")
 	}
 
-	return result, resultArgs, nil
+	return result.String(), resultArgs, nil
 }
 
 // TODO: candidate for caching
@@ -348,4 +429,64 @@ func createDestinations(source any, columns []string) ([]any, error) {
 	mapper.typeFieldCache[typeName] = indices
 
 	return dest, nil
+}
+
+// typeFieldDbTags
+//
+// Acts as a cache for struct field 'db' tag names.
+// Used as such:
+//
+// tagName := typeFieldDbTags[typeName][fieldNumber]
+var typeFieldDbTags = make(map[string][]string)
+
+func bindArgs(params ...any) (map[string]any, error) {
+	parameters := make(map[string]any)
+	for _, p := range params {
+		val := reflect.ValueOf(p)
+
+		switch val.Kind() {
+		case reflect.Map:
+			value := reflect.Indirect(val).Interface()
+			m := value.(map[string]any)
+
+			for k, v := range m {
+				if _, exists := parameters[k]; exists {
+					return nil, fmt.Errorf("found parameter with duplicate name: %s", k)
+				}
+
+				parameters[k] = v
+			}
+
+		case reflect.Struct:
+			// TODO: cache per type
+			value := reflect.Indirect(val)
+			valueType := reflect.TypeOf(p)
+
+			// Aggressively pre-cache the struct 'db' tag bindings.
+			typeName := valueType.Name()
+			fieldsCount := valueType.NumField()
+
+			fieldTags, found := typeFieldDbTags[typeName]
+			if !found {
+				fieldTags = make([]string, fieldsCount)
+				typeFieldDbTags[typeName] = fieldTags
+
+				for i := 0; i < fieldsCount; i++ {
+					field := valueType.Field(i)
+					tag, found := field.Tag.Lookup("db")
+					if !found {
+						return nil, fmt.Errorf("field %s is not tagged with 'db' tag", field.Name)
+					}
+
+					fieldTags[i] = tag
+				}
+			}
+
+			for i := 0; i < fieldsCount; i++ {
+				parameters[fieldTags[i]] = value.Field(i).Interface()
+			}
+		}
+	}
+
+	return parameters, nil
 }

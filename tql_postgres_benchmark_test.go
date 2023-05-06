@@ -1,0 +1,64 @@
+package tql
+
+import "testing"
+
+func Benchmark_Postgres_ParameterizeQuery(b *testing.B) {
+	b.StopTimer()
+	n, p, err := parameterIndicators("postgres")
+	if err != nil {
+		b.Fatalf("unexpected error: %s", err.Error())
+	}
+
+	type t struct {
+		Name  string `db:"name"`
+		Age   int    `db:"age"`
+		First string `db:"first"`
+		Last  string `db:"last"`
+	}
+	am := t{"Emanuel Skrenkovic", 30, "Emanuel", "Skrenkovic"}
+
+	const query = "INSERT INTO foo (a, b, c, d) VALUES (:name, :age, :first, :last)"
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		args, _ := bindArgs(am)
+		_, _, _ = parameterizeQuery(n, p, query, args)
+	}
+}
+
+func Benchmark_Postgres_bindArgs_Struct(b *testing.B) {
+	b.StopTimer()
+	type t struct {
+		Name  string `db:"name"`
+		Age   int    `db:"age"`
+		First string `db:"first"`
+		Last  string `db:"last"`
+	}
+	am := t{"Emanuel Skrenkovic", 30, "Emanuel", "Skrenkovic"}
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = bindArgs(am)
+	}
+}
+
+func Benchmark_Postgres_createDestinations(b *testing.B) {
+	b.StopTimer()
+	cols := []string{
+		"name",
+		"age",
+		"first",
+		"last",
+	}
+	type t struct {
+		Name  string `db:"name"`
+		Age   int    `db:"age"`
+		First string `db:"first"`
+		Last  string `db:"last"`
+	}
+	am := t{}
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = createDestinations(&am, cols)
+	}
+}
