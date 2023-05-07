@@ -325,7 +325,7 @@ func parameterizeQuery(
 		hasPositional bool
 
 		result     strings.Builder
-		resultArgs = make([]any, len(parameters))
+		resultArgs = make([]any, 0, len(parameters))
 
 		currentName strings.Builder
 		currentNum  int
@@ -354,7 +354,7 @@ func parameterizeQuery(
 			if !found {
 				return "", []any{}, fmt.Errorf("query parameter '%s' not found in provided parameters", currentName.String())
 			}
-			resultArgs[currentNum] = arg
+			resultArgs = append(resultArgs, arg)
 
 			insideName = false
 			currentNum++
