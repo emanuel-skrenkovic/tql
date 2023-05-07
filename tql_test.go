@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func Test_Postgres_ParameterizeQuery_Substition(t *testing.T) {
+func Test_Postgres_ParameterizeQuery_Substitution(t *testing.T) {
 	// Arrange
 	n, p, err := parameterIndicators("postgres")
 	if err != nil {
@@ -34,7 +34,7 @@ func Test_Postgres_ParameterizeQuery_Substition(t *testing.T) {
 	}
 }
 
-func Test_Postgres_ParameterizeQuery_Substition_Multiple_Parameters(t *testing.T) {
+func Test_Postgres_ParameterizeQuery_Substitution_Multiple_Parameters(t *testing.T) {
 	// Arrange
 	n, p, err := parameterIndicators("postgres")
 	if err != nil {

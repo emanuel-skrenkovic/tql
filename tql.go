@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 	"reflect"
 	"strconv"
 	"strings"
@@ -202,6 +201,36 @@ type Executor interface {
 }
 
 func Exec(ctx context.Context, e Executor, query string, params ...any) (sql.Result, error) {
+	parameters, err := mapParameters(params...)
+	if err != nil {
+		return nil, err
+	}
+
+	drivers := sql.Drivers()
+	// TODO: handle unknown - remove the check from here.
+	// TODO: allow an init-type escape hatch function to set the driver manually
+	if len(drivers) < 1 {
+		return nil, fmt.Errorf("no sql drivers loaded")
+	}
+
+	pos, nam, err := parameterIndicators(drivers[0])
+	if err != nil {
+		return nil, err
+	}
+
+	parameterizedQuery, args, err := parameterizeQuery(pos, nam, query, parameters)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(args) < 1 {
+		args = params
+	}
+
+	return e.ExecContext(ctx, parameterizedQuery, args...)
+}
+
+func mapParameters(params ...any) (map[string]any, error) {
 	parameters := make(map[string]any)
 	for _, p := range params {
 		val := reflect.ValueOf(p)
@@ -222,39 +251,34 @@ func Exec(ctx context.Context, e Executor, query string, params ...any) (sql.Res
 		case reflect.Struct:
 			// TODO: cache per type
 			value := reflect.Indirect(val)
+
 			valueType := reflect.TypeOf(p)
+			typeName := valueType.Name()
+			fieldsCount := valueType.NumField()
 
-			for i := 0; i < value.NumField(); i++ {
-				field := valueType.Field(i)
-				tag, found := field.Tag.Lookup("db")
-				if !found {
-					return nil, fmt.Errorf("field %s is not tagged with 'db' tag", field.Name)
+			fieldTags, found := typeFieldDbTags[typeName]
+			if !found {
+				fieldTags = make([]string, fieldsCount)
+				typeFieldDbTags[typeName] = fieldTags
+
+				for i := 0; i < fieldsCount; i++ {
+					field := valueType.Field(i)
+					tag, found := field.Tag.Lookup("db")
+					if !found {
+						return nil, fmt.Errorf("field %s is not tagged with 'db' tag", field.Name)
+					}
+
+					fieldTags[i] = tag
 				}
+			}
 
-				parameters[tag] = value.Field(i).Interface()
+			for i := 0; i < fieldsCount; i++ {
+				parameters[fieldTags[i]] = value.Field(i).Interface()
 			}
 		}
 	}
 
-	//driverName := sql.Drivers()[0]
-	driverName := "postgres"
-	pos, nam, err := parameterIndicators(driverName)
-	if err != nil {
-		return nil, err
-	}
-
-	parameterizedQuery, args, err := parameterizeQuery(pos, nam, query, parameters)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(args) < 1 {
-		args = params
-	}
-
-	log.Printf("QUERY: %s\n", parameterizedQuery)
-
-	return e.ExecContext(ctx, parameterizedQuery, args...)
+	return parameters, nil
 }
 
 func isNameChar(c rune) bool {
@@ -281,24 +305,6 @@ var driverIndicators = map[string]indicators{
 	"sqlite3":   {named: ':', positional: '?'},
 	"nrsqlite3": {named: ':', positional: '?'},
 }
-
-//var binds map[string]int = make(map[string]int)
-
-//// Bindvar types supported by Rebind, BindMap and BindStruct.
-//const (
-//	UNKNOWN = iota
-//	QUESTION
-//	DOLLAR
-//	NAMED
-//	AT
-//)
-//
-//var defaultBinds = map[int][]string{
-//	DOLLAR:   {"postgres", "pgx", "pq-timeouts", "cloudsqlpostgres", "ql", "nrpostgres", "cockroach"},
-//	QUESTION: {"mysql", "sqlite3", "nrmysql", "nrsqlite3"},
-//	NAMED:    {"oci8", "ora", "goracle", "godror"},
-//	AT:       {"sqlserver"},
-//}
 
 func parameterIndicators(driverName string) (rune, rune, error) {
 	i, found := driverIndicators[driverName]
@@ -458,7 +464,6 @@ func bindArgs(params ...any) (map[string]any, error) {
 			}
 
 		case reflect.Struct:
-			// TODO: cache per type
 			value := reflect.Indirect(val)
 			valueType := reflect.TypeOf(p)
 

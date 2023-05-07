@@ -55,10 +55,45 @@ func Benchmark_Postgres_createDestinations(b *testing.B) {
 		First string `db:"first"`
 		Last  string `db:"last"`
 	}
-	am := t{}
+	am := t{"Emanuel Skrenkovic", 30, "Emanuel", "Skrenkovic"}
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		_, _ = createDestinations(&am, cols)
+	}
+}
+
+func Benchmark_Postgres_mapParameters_Struct(b *testing.B) {
+	b.StopTimer()
+	type t struct {
+		Name  string `db:"name"`
+		Age   int    `db:"age"`
+		First string `db:"first"`
+		Last  string `db:"last"`
+	}
+	am := t{"Emanuel Skrenkovic", 30, "Emanuel", "Skrenkovic"}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = mapParameters(am)
+	}
+}
+
+func Benchmark_Postgres_mapParameters_Map(b *testing.B) {
+	b.StopTimer()
+	type t struct {
+		Name  string `db:"name"`
+		Age   int    `db:"age"`
+		First string `db:"first"`
+		Last  string `db:"last"`
+	}
+	am := map[string]any{
+		"name":  "Emanuel Skrenkovic",
+		"age":   30,
+		"first": "Emanuel",
+		"last":  "Skrenkovic",
+	}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = mapParameters(am)
 	}
 }
