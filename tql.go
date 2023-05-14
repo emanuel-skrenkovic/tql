@@ -3,6 +3,7 @@ package tql
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"reflect"
@@ -206,14 +207,9 @@ func Exec(ctx context.Context, e Executor, query string, params ...any) (sql.Res
 		return nil, err
 	}
 
-	drivers := sql.Drivers()
-	// TODO: handle unknown - remove the check from here.
-	// TODO: allow an init-type escape hatch function to set the driver manually
-	if len(drivers) < 1 {
-		return nil, fmt.Errorf("no sql drivers loaded")
-	}
-
-	pos, nam, err := parameterIndicators(drivers[0])
+	// #horribleways
+	driverName := sql.Drivers()[0]
+	pos, nam, err := parameterIndicators(driverName)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +228,13 @@ func Exec(ctx context.Context, e Executor, query string, params ...any) (sql.Res
 
 func mapParameters(params ...any) (map[string]any, error) {
 	parameters := make(map[string]any)
+
+ParamLoop:
 	for _, p := range params {
+		if _, ok := p.(driver.Valuer); ok {
+			continue
+		}
+
 		val := reflect.ValueOf(p)
 
 		switch val.Kind() {
@@ -263,6 +265,11 @@ func mapParameters(params ...any) (map[string]any, error) {
 
 				for i := 0; i < fieldsCount; i++ {
 					field := valueType.Field(i)
+
+					if !field.IsExported() {
+						continue ParamLoop
+					}
+
 					tag, found := field.Tag.Lookup("db")
 					if !found {
 						return nil, fmt.Errorf("field %s is not tagged with 'db' tag", field.Name)
@@ -273,7 +280,13 @@ func mapParameters(params ...any) (map[string]any, error) {
 			}
 
 			for i := 0; i < fieldsCount; i++ {
-				parameters[fieldTags[i]] = value.Field(i).Interface()
+				// TODO: too inefficient!
+				field := value.Field(i)
+				sf := valueType.Field(i)
+				if !sf.IsExported() {
+					continue
+				}
+				parameters[fieldTags[i]] = field.Interface()
 			}
 		}
 	}
@@ -411,7 +424,7 @@ func createDestinations(source any, columns []string) ([]any, error) {
 
 		tag, found := field.Tag.Lookup("db")
 		if !found {
-			return nil, fmt.Errorf("field %s is not tagged with 'db' tag", field.Name)
+			continue
 		}
 
 		indices[tag] = i
