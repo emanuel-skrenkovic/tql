@@ -1,3 +1,3 @@
-module github.com/eskrenkovic/typeql
+module github.com/eskrenkovic/tql
 
 go 1.20

@@ -1,4 +1,4 @@
-# typeql
+# tql
 
 A horrible name (blame AI) for a library that uses generics to execute database queries. 
 
