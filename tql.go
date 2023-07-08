@@ -20,6 +20,17 @@ var mapper = typeMapper{
 	typeFieldCache: make(map[string]map[string]int),
 }
 
+func SetActiveDriver(driver string) error {
+	for _, d := range sql.Drivers() {
+		if d == driver {
+			activeDriver = driver
+			return nil
+		}
+	}
+
+	return fmt.Errorf("cannot set active driver to %s driver %s is not registered", driver, driver)
+}
+
 type Querier interface {
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
@@ -208,7 +219,7 @@ func Exec(ctx context.Context, e Executor, query string, params ...any) (sql.Res
 	}
 
 	// #horribleways
-	driverName := sql.Drivers()[0]
+	driverName := activeDriver
 	pos, nam, err := parameterIndicators(driverName)
 	if err != nil {
 		return nil, err
@@ -251,7 +262,6 @@ ParamLoop:
 			}
 
 		case reflect.Struct:
-			// TODO: cache per type
 			value := reflect.Indirect(val)
 
 			valueType := reflect.TypeOf(p)
@@ -297,6 +307,8 @@ ParamLoop:
 func isNameChar(c rune) bool {
 	return unicode.IsLetter(c) || unicode.IsNumber(c) || c == '_'
 }
+
+var activeDriver string
 
 type indicators struct {
 	named      rune
@@ -372,8 +384,16 @@ func parameterizeQuery(
 			insideName = false
 			currentNum++
 
-			result.WriteRune(positionalParamIndicator)
-			result.Write([]byte(strconv.Itoa(currentNum)))
+			// No need for a default case here (famous last words).
+			// If there is no driver, then the execution will return
+			// an error before this part of code is executed.
+			switch activeDriver {
+			case "mysql":
+				result.WriteRune(positionalParamIndicator)
+			case "postgres":
+				result.WriteRune(positionalParamIndicator)
+				result.Write([]byte(strconv.Itoa(currentNum)))
+			}
 			result.WriteRune(c)
 			continue
 		}
