@@ -1,0 +1,33 @@
+version: '2.4'
+services:
+  tql-postgres:
+    image: postgres:14-alpine
+    command: ["postgres"]
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=test
+    ports:
+      - "5432:5432"
+    expose:
+      - "5432"
+    networks:
+      - tql-network
+
+  tql-mariadb:
+    image: mariadb:11.0.2-jammy
+    environment:
+      - MARIADB_USER=mariadb
+      - MARIADB_PASSWORD=mariadb
+      - MARIADB_ROOT_PASSWORD=mariadb
+      - MARIADB_DATABASE=test
+    ports:
+      - "3306:3306"
+    expose:
+      - "3306"
+    networks:
+      - tql-network
+
+networks:
+  tql-network:
+    name: tql-network

@@ -1,11 +1,30 @@
 package tql
 
 import (
+	"database/sql"
+	"database/sql/driver"
+	"fmt"
 	"testing"
 )
 
+type dummyDriver struct{}
+
+func (d dummyDriver) Open(name string) (driver.Conn, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func TestMain(m *testing.M) {
+	sql.Register("postgres", dummyDriver{})
+	m.Run()
+}
+
 func Test_Postgres_ParameterizeQuery_Substitution(t *testing.T) {
 	// Arrange
+	err := SetActiveDriver("postgres")
+	if err != nil {
+		t.Fatalf("failed to set driver: %s", err.Error())
+	}
+
 	n, p, err := parameterIndicators("postgres")
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err.Error())
@@ -36,6 +55,11 @@ func Test_Postgres_ParameterizeQuery_Substitution(t *testing.T) {
 
 func Test_Postgres_ParameterizeQuery_Substitution_Multiple_Parameters(t *testing.T) {
 	// Arrange
+	err := SetActiveDriver("postgres")
+	if err != nil {
+		t.Fatalf("failed to set driver: %s", err.Error())
+	}
+
 	n, p, err := parameterIndicators("postgres")
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err.Error())
