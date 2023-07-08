@@ -15,11 +15,6 @@ import (
 	_ "github.com/lib/pq"
 )
 
-type result struct {
-	ID       string  `db:"id"`
-	Nullable *string `db:"nullable"`
-}
-
 func Test_Postgresql_QueryOne(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
