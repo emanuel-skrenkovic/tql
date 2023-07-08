@@ -388,7 +388,7 @@ func parameterizeQuery(
 			// If there is no driver, then the execution will return
 			// an error before this part of code is executed.
 			switch activeDriver {
-			case "mysql":
+			case "mysql", "sqlite3":
 				result.WriteRune(positionalParamIndicator)
 			case "postgres":
 				result.WriteRune(positionalParamIndicator)
