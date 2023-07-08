@@ -44,7 +44,7 @@ func Test_Sqlite3_QueryOne_String(t *testing.T) {
 	require.NoError(t, err)
 
 	// Act
-	r, err := tql.QueryFirst[string](context.Background(), sqlite3DB, "SELECT id FROM test WHERE id = $1;", id)
+	r, err := tql.QueryFirst[string](context.Background(), sqlite3DB, "SELECT id FROM test WHERE id = ?;", id)
 
 	// Assert
 	require.NoError(t, err)
@@ -62,7 +62,7 @@ func Test_Sqlite3_QueryOne_String_Pointer(t *testing.T) {
 	require.NoError(t, err)
 
 	// Act
-	r, err := tql.QueryFirst[*string](context.Background(), sqlite3DB, "SELECT id FROM test WHERE id = $1;", id)
+	r, err := tql.QueryFirst[*string](context.Background(), sqlite3DB, "SELECT id FROM test WHERE id = ?;", id)
 
 	// Assert
 	require.NoError(t, err)
@@ -177,7 +177,7 @@ func Test_Sqlite3_Exec(t *testing.T) {
 
 	// Assert
 	require.NoError(t, err)
-	r, err := tql.QueryFirst[result](context.Background(), sqlite3DB, "SELECT * FROM test WHERE id = $1;", "totally_new_id")
+	r, err := tql.QueryFirst[result](context.Background(), sqlite3DB, "SELECT * FROM test WHERE id = ?;", "totally_new_id")
 
 	require.NotEmpty(t, r)
 	require.Equal(t, "totally_new_id", r.ID)
@@ -205,7 +205,7 @@ func Test_Sqlite3_Exec_With_Struct(t *testing.T) {
 
 	// Assert
 	require.NoError(t, err)
-	r, err := tql.QueryFirst[result](context.Background(), sqlite3DB, "SELECT * FROM test WHERE id = $1;", id)
+	r, err := tql.QueryFirst[result](context.Background(), sqlite3DB, "SELECT * FROM test WHERE id = ?;", id)
 
 	require.NotEmpty(t, r)
 	require.Equal(t, id, r.ID)
@@ -220,14 +220,14 @@ func Test_Sqlite3_Exec_Not_Named(t *testing.T) {
 
 	id := uuid.NewString()
 	userID := uuid.NewString()
-	const insertStmt = "INSERT INTO test (id, nullable) VALUES ($1, $2);"
+	const insertStmt = "INSERT INTO test (id, nullable) VALUES (?, ?);"
 
 	// Act
 	_, err := tql.Exec(context.Background(), sqlite3DB, insertStmt, id, userID)
 
 	// Assert
 	require.NoError(t, err)
-	r, err := tql.QueryFirst[result](context.Background(), sqlite3DB, "SELECT * FROM test WHERE id = $1;", id)
+	r, err := tql.QueryFirst[result](context.Background(), sqlite3DB, "SELECT * FROM test WHERE id = ?;", id)
 
 	require.NotEmpty(t, r)
 	require.Equal(t, id, r.ID)
