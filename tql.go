@@ -37,7 +37,7 @@ type Querier interface {
 }
 
 func QuerySingleOrDefault[T any](ctx context.Context, q Querier, def T, query string, params ...any) (result T, err error) {
-	result, err = QuerySingle[T](ctx, q, query, params)
+	result, err = QuerySingle[T](ctx, q, query, params...)
 	switch {
 	case err != nil && errors.Is(err, sql.ErrNoRows):
 		return def, nil
@@ -49,7 +49,7 @@ func QuerySingleOrDefault[T any](ctx context.Context, q Querier, def T, query st
 }
 
 func QuerySingle[T any](ctx context.Context, q Querier, query string, params ...any) (result T, err error) {
-	results, err := Query[T](ctx, q, query, params)
+	results, err := Query[T](ctx, q, query, params...)
 	if err != nil {
 		return result, err
 	}
@@ -62,7 +62,7 @@ func QuerySingle[T any](ctx context.Context, q Querier, query string, params ...
 }
 
 func QueryFirstOrDefault[T any](ctx context.Context, q Querier, def T, query string, params ...any) (result T, err error) {
-	result, err = QueryFirst[T](ctx, q, query, params)
+	result, err = QueryFirst[T](ctx, q, query, params...)
 	switch {
 	case err != nil && errors.Is(err, sql.ErrNoRows):
 		return def, nil
@@ -74,13 +74,15 @@ func QueryFirstOrDefault[T any](ctx context.Context, q Querier, def T, query str
 }
 
 func QueryFirst[T any](ctx context.Context, q Querier, query string, params ...any) (result T, err error) {
-	rows, err := q.QueryContext(ctx, query, params...)
+	var rows *sql.Rows
+	rows, err = q.QueryContext(ctx, query, params...)
 	if err != nil {
 		return result, err
 	}
 
 	if rows == nil {
-		return result, sql.ErrNoRows
+		err = sql.ErrNoRows
+		return result, err
 	}
 
 	defer func() {
@@ -88,14 +90,15 @@ func QueryFirst[T any](ctx context.Context, q Querier, query string, params ...a
 			return
 		}
 
-		if err = rows.Close(); err != nil {
+		if closeErr := rows.Close(); closeErr != nil {
 			// #horribleways
-			err = fmt.Errorf("failed to close rows: %w", err)
+			err = fmt.Errorf("failed to close rows: %w", closeErr)
 		}
 	}()
 
 	if !rows.Next() {
-		return result, sql.ErrNoRows
+		err = sql.ErrNoRows
+		return result, err
 	}
 
 	val := reflect.Indirect(reflect.ValueOf(result))

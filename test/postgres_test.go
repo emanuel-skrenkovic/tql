@@ -15,6 +15,67 @@ import (
 	_ "github.com/lib/pq"
 )
 
+func Test_Postgresql_QueryFirstOrDefault_Returns_First_Result(t *testing.T) {
+	// Arrange
+	require.NoError(t, tql.SetActiveDriver("postgres"))
+
+	id := uuid.New()
+	nullable := uuid.New()
+
+	_, err := pgDB.Exec(fmt.Sprintf("INSERT INTO test VALUES ('%s', '%s');", id.String(), nullable.String()))
+	require.NoError(t, err)
+
+	d := result{
+		ID: uuid.NewString(),
+	}
+
+	// Act
+	r, err := tql.QueryFirstOrDefault[result](context.Background(), pgDB, d, "SELECT id, nullable FROM test;")
+
+	// Assert
+	require.NoError(t, err)
+	require.Equal(t, id.String(), r.ID)
+	require.NotNil(t, r.Nullable)
+	require.Equal(t, nullable.String(), *r.Nullable)
+
+	require.NotEqual(t, d.ID, r.ID)
+}
+
+func Test_Postgresql_QueryFirstOrDefault_Returns_Default_When_Query_Returns_No_Results(t *testing.T) {
+	// Arrange
+	require.NoError(t, tql.SetActiveDriver("postgres"))
+
+	id := uuid.New()
+	nullable := uuid.New()
+
+	_, err := pgDB.Exec(fmt.Sprintf("INSERT INTO test VALUES ('%s', '%s');", id.String(), nullable.String()))
+	require.NoError(t, err)
+
+	defaultNullable := uuid.NewString()
+	d := result{
+		ID:       uuid.NewString(),
+		Nullable: &defaultNullable,
+	}
+
+	// Act
+	r, err := tql.QueryFirstOrDefault[result](
+		context.Background(),
+		pgDB,
+		d,
+		"SELECT id, nullable FROM test where id = $1;",
+		uuid.NewString(),
+	)
+
+	// Assert
+	require.NoError(t, err)
+	require.NotEqual(t, id.String(), r.ID)
+	require.NotEqual(t, nullable.String(), *r.Nullable)
+
+	require.Equal(t, d.ID, r.ID)
+	require.NotNil(t, r.Nullable)
+	require.Equal(t, defaultNullable, *r.Nullable)
+}
+
 func Test_Postgresql_QueryOne(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
@@ -26,7 +87,7 @@ func Test_Postgresql_QueryOne(t *testing.T) {
 	require.NoError(t, err)
 
 	// Act
-	r, err := tql.QueryFirst[result](context.Background(), pgDB, "SELECT id, nullable FROM test;")
+	r, err := tql.QueryFirst[result](context.Background(), pgDB, "SELECT id, nullable FROM test WHERE id = $1;", id)
 
 	// Assert
 	require.NoError(t, err)
@@ -94,7 +155,26 @@ func Test_Postgresql_QueryOne_Int_Pointer(t *testing.T) {
 func Test_Postgresql_Query(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
-	_, err := pgDB.Exec("INSERT INTO test (id, nullable) VALUES ('asdf', 'fdsa');")
+
+	_, err := pgDB.Exec("DELETE FROM test;")
+	require.NoError(t, err)
+
+	const insertStmt = `
+		INSERT INTO 
+		    test (id, nullable) 
+		VALUES 
+		    ($1, $2),
+			($3, $4),
+			($5, $6),
+			($7, $8),
+			($9, $10);`
+
+	ids := make([]any, 10)
+	for i := 0; i < 10; i++ {
+		ids[i] = uuid.NewString()
+	}
+
+	_, err = pgDB.Exec(insertStmt, ids...)
 	require.NoError(t, err)
 
 	// Act
@@ -103,40 +183,71 @@ func Test_Postgresql_Query(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	require.Len(t, r, 5)
-	require.Equal(t, "asdf", r[4].ID)
-	require.NotNil(t, r[4].Nullable)
-	require.Equal(t, "fdsa", *r[4].Nullable)
+
+	for _, result := range r {
+		require.NotEmpty(t, result.ID)
+		require.NotNil(t, result.Nullable)
+	}
 }
 
-func Test_Postgresql_Query_Basic_Type(t *testing.T) {
+func Test_Postgresql_Query_Basic_Type_From_Tx(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
+
+	_, err := pgDB.Exec("DELETE FROM test;")
+	require.NoError(t, err)
+
+	const insertStmt = `
+		INSERT INTO 
+		    test (id, nullable) 
+		VALUES 
+		    ($1, $2);`
+
+	id := uuid.NewString()
+	nullable := uuid.NewString()
+
+	_, err = pgDB.Exec(insertStmt, id, nullable)
+	require.NoError(t, err)
+
 	tx, _ := pgDB.BeginTx(context.Background(), &sql.TxOptions{})
 
 	// Act
-	r, err := tql.Query[string](context.Background(), tx, "SELECT id FROM test;")
+	r, err := tql.QueryFirst[string](context.Background(), tx, "SELECT id FROM test;")
 
 	require.NoError(t, tx.Commit())
 
 	// Assert
 	require.NoError(t, err)
-	require.Len(t, r, 5)
-	require.Equal(t, "asdf", r[4])
-	require.NotNil(t, r[4])
+	require.NotEmpty(t, r)
+	require.Equal(t, id, r)
 }
 
 func Test_Postgresql_Query_Basic_Type_Pointer(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
 
+	_, err := pgDB.Exec("DELETE FROM test;")
+	require.NoError(t, err)
+
+	const insertStmt = `
+		INSERT INTO 
+		    test (id, nullable) 
+		VALUES 
+		    ($1, $2);`
+
+	id := uuid.NewString()
+	nullable := uuid.NewString()
+
+	_, err = pgDB.Exec(insertStmt, id, nullable)
+	require.NoError(t, err)
+
 	// Act
-	r, err := tql.Query[*string](context.Background(), pgDB, "SELECT id FROM test;")
+	r, err := tql.QueryFirst[*string](context.Background(), pgDB, "SELECT id FROM test;")
 
 	// Assert
 	require.NoError(t, err)
-	require.Len(t, r, 5)
-	require.Equal(t, "asdf", *r[4])
-	require.NotNil(t, r[4])
+	require.NotEmpty(t, r)
+	require.Equal(t, id, *r)
 }
 
 func Test_Postgresql_Query_Basic_Type_Pointer_Null(t *testing.T) {
@@ -255,6 +366,6 @@ func Test_Postgresql_Exec_Mixed_Named_Positional(t *testing.T) {
 	//require.ErrorIs(t, err, fmt.Errorf("mixed positional and named parameters"))
 
 	r, err := tql.QueryFirst[result](context.Background(), pgDB, "SELECT * FROM test WHERE id = $1;", id)
-	require.NoError(t, err)
+	require.ErrorIs(t, err, sql.ErrNoRows)
 	require.Empty(t, r)
 }
