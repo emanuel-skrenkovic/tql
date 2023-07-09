@@ -22,6 +22,14 @@ var mapper = typeMapper{
 	typeFieldCache: make(map[string]map[string]int),
 }
 
+// SetActiveDriver
+//
+// *Do not use this!*
+//
+// Sets which driver to use to know which parameter syntax to use.
+// Don't use this, it's global state, it's not safe for concurrent use, and it is bad.
+// It is just here so I can choose which driver I want to use in the tests for tql,
+// and the tests are in a separate module so this is public.
 func SetActiveDriver(driver string) error {
 	for _, d := range sql.Drivers() {
 		if d == driver {
@@ -98,6 +106,9 @@ func QueryFirstOrDefault[T any](ctx context.Context, q Querier, def T, query str
 	}
 }
 
+// QueryFirst
+// Queries the table and returns the first result. If the query returns no results,
+// the function returns sql.ErrNoRows.
 func QueryFirst[T any](ctx context.Context, q Querier, query string, params ...any) (result T, err error) {
 	var rows *sql.Rows
 	rows, err = q.QueryContext(ctx, query, params...)
@@ -168,10 +179,16 @@ func QueryFirst[T any](ctx context.Context, q Querier, query string, params ...a
 	return result, err
 }
 
+// Query
+// Queries the database and returns all the results as a slice. If the query returns no results,
+// an empty slice of type T is returned. This matches the sql.QueryContext function from database/sql.
 func Query[T any](ctx context.Context, q Querier, query string, params ...any) (result []T, err error) {
+	// TODO: think about returning sql.ErrNoRows if no results are found.
+
 	result = make([]T, 0)
 
-	rows, err := q.QueryContext(ctx, query, params...)
+	var rows *sql.Rows
+	rows, err = q.QueryContext(ctx, query, params...)
 	if err != nil {
 		return result, err
 	}
@@ -240,6 +257,15 @@ type Executor interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 }
 
+// Exec
+// Executes a statement and returns sql.Result.
+//
+// The statement can be parameterised using, either, the positional parameters
+// (e.g. $1, $2 or ?,  ?, depending on the driver) or using named
+// parameters (such as :parameter1, :parameter2).
+//
+// When using named parameters with structs as params, the names in the query *must* be specified as the
+// db tag in the struct name. When using a map, the keys will be the names.
 func Exec(ctx context.Context, e Executor, query string, params ...any) (sql.Result, error) {
 	parameters, err := mapParameters(params...)
 	if err != nil {
@@ -253,7 +279,7 @@ func Exec(ctx context.Context, e Executor, query string, params ...any) (sql.Res
 		return nil, err
 	}
 
-	parameterizedQuery, args, err := parameterizeQuery(pos, nam, query, parameters)
+	parameterisedQuery, args, err := parameteriseQuery(pos, nam, query, parameters)
 	if err != nil {
 		return nil, err
 	}
@@ -262,7 +288,7 @@ func Exec(ctx context.Context, e Executor, query string, params ...any) (sql.Res
 		args = params
 	}
 
-	return e.ExecContext(ctx, parameterizedQuery, args...)
+	return e.ExecContext(ctx, parameterisedQuery, args...)
 }
 
 func mapParameters(params ...any) (map[string]any, error) {
@@ -367,7 +393,7 @@ func parameterIndicators(driverName string) (rune, rune, error) {
 	return i.named, i.positional, nil
 }
 
-func parameterizeQuery(
+func parameteriseQuery(
 	namedParamIndicator rune,
 	positionalParamIndicator rune,
 	query string,

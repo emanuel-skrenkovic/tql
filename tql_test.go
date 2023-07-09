@@ -18,7 +18,7 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func Test_Postgres_ParameterizeQuery_Substitution(t *testing.T) {
+func Test_Postgres_ParameteriseQuery_Substitution(t *testing.T) {
 	// Arrange
 	err := SetActiveDriver("postgres")
 	if err != nil {
@@ -32,7 +32,7 @@ func Test_Postgres_ParameterizeQuery_Substitution(t *testing.T) {
 
 	const query = "SELECT * FROM tablename WHERE id = :id;"
 	// Act
-	parameterizedQuery, args, err := parameterizeQuery(n, p, query, map[string]any{"id": "123"})
+	parameterisedQuery, args, err := parameteriseQuery(n, p, query, map[string]any{"id": "123"})
 
 	// Assert
 	if err != nil {
@@ -43,17 +43,17 @@ func Test_Postgres_ParameterizeQuery_Substitution(t *testing.T) {
 		t.Fatalf("expected len %d found %d", 1, len(args))
 	}
 
-	if parameterizedQuery == "" {
-		t.Fatalf("unexpected empty 'parameterizedQuery'")
+	if parameterisedQuery == "" {
+		t.Fatalf("unexpected empty 'parameterisedQuery'")
 	}
 
-	const expectedParameterizedQuery = "SELECT * FROM tablename WHERE id = $1;"
-	if parameterizedQuery != expectedParameterizedQuery {
-		t.Fatalf("value '%s' does not equal expected '%s'", parameterizedQuery, expectedParameterizedQuery)
+	const expectedParameterisedQuery = "SELECT * FROM tablename WHERE id = $1;"
+	if parameterisedQuery != expectedParameterisedQuery {
+		t.Fatalf("value '%s' does not equal expected '%s'", parameterisedQuery, expectedParameterisedQuery)
 	}
 }
 
-func Test_Postgres_ParameterizeQuery_Substitution_Multiple_Parameters(t *testing.T) {
+func Test_Postgres_ParameteriseQuery_Substitution_Multiple_Parameters(t *testing.T) {
 	// Arrange
 	err := SetActiveDriver("postgres")
 	if err != nil {
@@ -67,7 +67,7 @@ func Test_Postgres_ParameterizeQuery_Substitution_Multiple_Parameters(t *testing
 
 	const query = "SELECT * FROM tablename WHERE id = :id OR name = :name;"
 	// Act
-	parameterizedQuery, args, err := parameterizeQuery(n, p, query, map[string]any{"name": "123", "id": "123"})
+	parameterisedQuery, args, err := parameteriseQuery(n, p, query, map[string]any{"name": "123", "id": "123"})
 
 	// Assert
 	if err != nil {
@@ -79,12 +79,12 @@ func Test_Postgres_ParameterizeQuery_Substitution_Multiple_Parameters(t *testing
 		t.Fatalf("expected len %d found %d", expectedArgsLen, len(args))
 	}
 
-	if parameterizedQuery == "" {
-		t.Fatalf("unexpected empty 'parameterizedQuery'")
+	if parameterisedQuery == "" {
+		t.Fatalf("unexpected empty 'parameterisedQuery'")
 	}
 
-	const expectedParameterizedQuery = "SELECT * FROM tablename WHERE id = $1 OR name = $2;"
-	if parameterizedQuery != expectedParameterizedQuery {
-		t.Fatalf("value '%s' does not equal expected '%s'", parameterizedQuery, expectedParameterizedQuery)
+	const expectedParameterisedQuery = "SELECT * FROM tablename WHERE id = $1 OR name = $2;"
+	if parameterisedQuery != expectedParameterisedQuery {
+		t.Fatalf("value '%s' does not equal expected '%s'", parameterisedQuery, expectedParameterisedQuery)
 	}
 }

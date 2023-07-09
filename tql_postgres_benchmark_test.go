@@ -2,7 +2,7 @@ package tql
 
 import "testing"
 
-func Benchmark_Postgres_ParameterizeQuery(b *testing.B) {
+func Benchmark_Postgres_ParameteriseQuery(b *testing.B) {
 	b.StopTimer()
 	n, p, err := parameterIndicators("postgres")
 	if err != nil {
@@ -21,7 +21,7 @@ func Benchmark_Postgres_ParameterizeQuery(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		args, _ := bindArgs(am)
-		_, _, _ = parameterizeQuery(n, p, query, args)
+		_, _, _ = parameteriseQuery(n, p, query, args)
 	}
 }
 
