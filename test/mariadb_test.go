@@ -10,6 +10,270 @@ import (
 	"testing"
 )
 
+func Test_MariaDB_QueryFirstOrDefault_Returns_First_Result(t *testing.T) {
+	// Arrange
+	require.NoError(t, tql.SetActiveDriver("mysql"))
+
+	id := uuid.New()
+	nullable := uuid.New()
+
+	_, err := mariaDB.Exec(fmt.Sprintf("INSERT INTO test VALUES ('%s', '%s');", id.String(), nullable.String()))
+	require.NoError(t, err)
+
+	d := result{
+		ID: uuid.NewString(),
+	}
+
+	// Act
+	r, err := tql.QueryFirstOrDefault[result](context.Background(), mariaDB, d, "SELECT id, nullable FROM test;")
+
+	// Assert
+	require.NoError(t, err)
+	require.Equal(t, id.String(), r.ID)
+	require.NotNil(t, r.Nullable)
+	require.Equal(t, nullable.String(), *r.Nullable)
+
+	require.NotEqual(t, d.ID, r.ID)
+}
+
+func Test_MariaDB_QueryFirstOrDefault_Returns_Default_When_Query_Returns_No_Results(t *testing.T) {
+	// Arrange
+	require.NoError(t, tql.SetActiveDriver("mysql"))
+
+	id := uuid.New()
+	nullable := uuid.New()
+
+	_, err := mariaDB.Exec(fmt.Sprintf("INSERT INTO test VALUES ('%s', '%s');", id.String(), nullable.String()))
+	require.NoError(t, err)
+
+	defaultNullable := uuid.NewString()
+	d := result{
+		ID:       uuid.NewString(),
+		Nullable: &defaultNullable,
+	}
+
+	// Act
+	r, err := tql.QueryFirstOrDefault[result](
+		context.Background(),
+		mariaDB,
+		d,
+		"SELECT id, nullable FROM test where id = ?;",
+		uuid.NewString(),
+	)
+
+	// Assert
+	require.NoError(t, err)
+	require.NotEqual(t, id.String(), r.ID)
+	require.NotEqual(t, nullable.String(), *r.Nullable)
+
+	require.Equal(t, d.ID, r.ID)
+	require.NotNil(t, r.Nullable)
+	require.Equal(t, defaultNullable, *r.Nullable)
+}
+
+func Test_MariaDB_QueryFirstOrDefault_Returns_First_Result_When_Query_Returns_Multiple_Results(t *testing.T) {
+	// Arrange
+	require.NoError(t, tql.SetActiveDriver("mysql"))
+
+	id := uuid.NewString()
+	nullable := uuid.NewString()
+
+	_, err := mariaDB.Exec(
+		fmt.Sprintf(
+			"INSERT INTO test VALUES ('%s', '%s'), ('%s', '%s');",
+			id,
+			nullable,
+			uuid.NewString(),
+			nullable,
+		),
+	)
+	require.NoError(t, err)
+
+	defaultNullable := uuid.NewString()
+	d := result{
+		ID:       uuid.NewString(),
+		Nullable: &defaultNullable,
+	}
+
+	// Act
+	r, err := tql.QueryFirstOrDefault[result](
+		context.Background(),
+		mariaDB,
+		d,
+		"SELECT id, nullable FROM test where nullable = ?;",
+		nullable,
+	)
+
+	// Assert
+	require.NoError(t, err)
+	require.NotNil(t, r.Nullable)
+	require.Equal(t, nullable, *r.Nullable)
+
+	require.NotEqual(t, defaultNullable, *r.Nullable)
+}
+
+func Test_MariaDB_QuerySingle_Returns_sqlErrNoRows_When_Query_Returns_No_Results(t *testing.T) {
+	// Arrange
+	require.NoError(t, tql.SetActiveDriver("mysql"))
+
+	id := uuid.New()
+	nullable := uuid.New()
+
+	_, err := mariaDB.Exec(fmt.Sprintf("INSERT INTO test VALUES ('%s', '%s');", id.String(), nullable.String()))
+	require.NoError(t, err)
+
+	// Act
+	r, err := tql.QuerySingle[result](
+		context.Background(),
+		mariaDB,
+		"SELECT id, nullable FROM test where id = ?;",
+		uuid.NewString(),
+	)
+
+	// Assert
+	require.ErrorIs(t, err, sql.ErrNoRows)
+	require.Empty(t, r)
+}
+
+func Test_MariaDB_QuerySingle_Returns_tqlErrMultipleResults_When_Query_Returns_Multiple_Results(t *testing.T) {
+	// Arrange
+	require.NoError(t, tql.SetActiveDriver("mysql"))
+
+	id := uuid.NewString()
+	nullable := uuid.NewString()
+
+	_, err := mariaDB.Exec(
+		fmt.Sprintf(
+			"INSERT INTO test VALUES ('%s', '%s'), ('%s', '%s');",
+			id,
+			nullable,
+			uuid.NewString(),
+			nullable,
+		),
+	)
+	require.NoError(t, err)
+
+	// Act
+	r, err := tql.QuerySingle[result](
+		context.Background(),
+		mariaDB,
+		"SELECT id, nullable FROM test where nullable = ?;",
+		nullable,
+	)
+
+	// Assert
+	require.ErrorIs(t, err, tql.ErrMultipleResults)
+	require.Empty(t, r)
+}
+
+func Test_MariaDB_QuerySingleOrDefault_Returns_Result_When_Query_Returns_Single_Result(t *testing.T) {
+	// Arrange
+	require.NoError(t, tql.SetActiveDriver("mysql"))
+
+	id := uuid.New()
+	nullable := uuid.New()
+
+	_, err := mariaDB.Exec(fmt.Sprintf("INSERT INTO test VALUES ('%s', '%s');", id.String(), nullable.String()))
+	require.NoError(t, err)
+
+	defaultNullable := uuid.NewString()
+	d := result{
+		ID:       uuid.NewString(),
+		Nullable: &defaultNullable,
+	}
+
+	// Act
+	r, err := tql.QuerySingleOrDefault[result](
+		context.Background(),
+		mariaDB,
+		d,
+		"SELECT id, nullable FROM test where id = ?;",
+		id,
+	)
+
+	// Assert
+	require.NoError(t, err)
+	require.Equal(t, id.String(), r.ID)
+	require.NotNil(t, r.Nullable)
+	require.Equal(t, nullable.String(), *r.Nullable)
+
+	require.NotEqual(t, d.ID, r.ID)
+	require.NotEqual(t, defaultNullable, *r.Nullable)
+}
+
+func Test_MariaDB_QuerySingleOrDefault_Returns_Default_When_Query_Returns_No_Results(t *testing.T) {
+	// Arrange
+	require.NoError(t, tql.SetActiveDriver("mysql"))
+
+	id := uuid.New()
+	nullable := uuid.New()
+
+	_, err := mariaDB.Exec(fmt.Sprintf("INSERT INTO test VALUES ('%s', '%s');", id.String(), nullable.String()))
+	require.NoError(t, err)
+
+	defaultNullable := uuid.NewString()
+	d := result{
+		ID:       uuid.NewString(),
+		Nullable: &defaultNullable,
+	}
+
+	// Act
+	r, err := tql.QuerySingleOrDefault[result](
+		context.Background(),
+		mariaDB,
+		d,
+		"SELECT id, nullable FROM test where id = ?;",
+		uuid.NewString(),
+	)
+
+	// Assert
+	require.NoError(t, err)
+	require.NotEqual(t, id.String(), r.ID)
+	require.NotEqual(t, nullable.String(), *r.Nullable)
+
+	require.Equal(t, d.ID, r.ID)
+	require.NotNil(t, r.Nullable)
+	require.Equal(t, defaultNullable, *r.Nullable)
+}
+
+func Test_MariaDB_QuerySingleOrDefault_Returns_tqlErrMultipleResults_When_Query_Returns_Multiple_Results(t *testing.T) {
+	// Arrange
+	require.NoError(t, tql.SetActiveDriver("mysql"))
+
+	id := uuid.NewString()
+	nullable := uuid.NewString()
+
+	_, err := mariaDB.Exec(
+		fmt.Sprintf(
+			"INSERT INTO test VALUES ('%s', '%s'), ('%s', '%s');",
+			id,
+			nullable,
+			uuid.NewString(),
+			nullable,
+		),
+	)
+	require.NoError(t, err)
+
+	defaultNullable := uuid.NewString()
+	d := result{
+		ID:       uuid.NewString(),
+		Nullable: &defaultNullable,
+	}
+
+	// Act
+	r, err := tql.QuerySingleOrDefault[result](
+		context.Background(),
+		mariaDB,
+		d,
+		"SELECT id, nullable FROM test where nullable = ?;",
+		nullable,
+	)
+
+	// Assert
+	require.ErrorIs(t, err, tql.ErrMultipleResults)
+	require.Empty(t, r)
+}
+
 func Test_MariaDB_QueryOne(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("mysql"))
@@ -21,7 +285,7 @@ func Test_MariaDB_QueryOne(t *testing.T) {
 	require.NoError(t, err)
 
 	// Act
-	r, err := tql.QueryFirst[result](context.Background(), mariaDB, "SELECT id, nullable FROM test;")
+	r, err := tql.QueryFirst[result](context.Background(), mariaDB, "SELECT id, nullable FROM test WHERE id = ?;", id)
 
 	// Assert
 	require.NoError(t, err)

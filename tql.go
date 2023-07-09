@@ -12,6 +12,8 @@ import (
 	"unicode"
 )
 
+var ErrMultipleResults = errors.New("sql: found multiple results expected single")
+
 type typeMapper struct {
 	typeFieldCache map[string]map[string]int
 }
@@ -36,6 +38,14 @@ type Querier interface {
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
+// QuerySingleOrDefault
+// A variant of QueryFirstOrDefault that expects only a single result.
+//
+// If the query returns more than one result, this function returns tql.ErrMultipleResults.
+//
+// If the query returns no results, this function return the provided default.
+//
+// If the query returns a single result, this function returns the result.
 func QuerySingleOrDefault[T any](ctx context.Context, q Querier, def T, query string, params ...any) (result T, err error) {
 	result, err = QuerySingle[T](ctx, q, query, params...)
 	switch {
@@ -48,17 +58,32 @@ func QuerySingleOrDefault[T any](ctx context.Context, q Querier, def T, query st
 	}
 }
 
-func QuerySingle[T any](ctx context.Context, q Querier, query string, params ...any) (result T, err error) {
+// QuerySingle
+// Queries the table to return one result. A variant of QueryFirst that expects only a single result.
+//
+// If the query returns more than one result, this function returns tql.ErrMultipleResults.
+//
+// If the query returns no results, this function return sql.ErrNoRows.
+//
+// If the query returns a single result, this function returns the result.
+func QuerySingle[T any](ctx context.Context, q Querier, query string, params ...any) (T, error) {
+	var result T
 	results, err := Query[T](ctx, q, query, params...)
 	if err != nil {
 		return result, err
 	}
 
-	if len(results) > 1 {
-		return result, fmt.Errorf("found more than one result")
+	resultsLen := len(results)
+
+	if resultsLen < 1 {
+		return result, sql.ErrNoRows
 	}
 
-	return result, err
+	if resultsLen > 1 {
+		return result, ErrMultipleResults
+	}
+
+	return results[0], err
 }
 
 func QueryFirstOrDefault[T any](ctx context.Context, q Querier, def T, query string, params ...any) (result T, err error) {

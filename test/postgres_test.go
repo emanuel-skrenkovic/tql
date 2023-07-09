@@ -76,6 +76,209 @@ func Test_Postgresql_QueryFirstOrDefault_Returns_Default_When_Query_Returns_No_R
 	require.Equal(t, defaultNullable, *r.Nullable)
 }
 
+func Test_Postgresql_QueryFirstOrDefault_Returns_First_Result_When_Query_Returns_Multiple_Results(t *testing.T) {
+	// Arrange
+	require.NoError(t, tql.SetActiveDriver("postgres"))
+
+	id := uuid.NewString()
+	nullable := uuid.NewString()
+
+	_, err := pgDB.Exec(
+		fmt.Sprintf(
+			"INSERT INTO test VALUES ('%s', '%s'), ('%s', '%s');",
+			id,
+			nullable,
+			uuid.NewString(),
+			nullable,
+		),
+	)
+	require.NoError(t, err)
+
+	defaultNullable := uuid.NewString()
+	d := result{
+		ID:       uuid.NewString(),
+		Nullable: &defaultNullable,
+	}
+
+	// Act
+	r, err := tql.QueryFirstOrDefault[result](
+		context.Background(),
+		pgDB,
+		d,
+		"SELECT id, nullable FROM test where nullable = $1;",
+		nullable,
+	)
+
+	// Assert
+	require.NoError(t, err)
+	require.NotNil(t, r.Nullable)
+	require.Equal(t, nullable, *r.Nullable)
+
+	require.NotEqual(t, defaultNullable, *r.Nullable)
+}
+
+func Test_Postgresql_QuerySingle_Returns_sqlErrNoRows_When_Query_Returns_No_Results(t *testing.T) {
+	// Arrange
+	require.NoError(t, tql.SetActiveDriver("postgres"))
+
+	id := uuid.New()
+	nullable := uuid.New()
+
+	_, err := pgDB.Exec(fmt.Sprintf("INSERT INTO test VALUES ('%s', '%s');", id.String(), nullable.String()))
+	require.NoError(t, err)
+
+	// Act
+	r, err := tql.QuerySingle[result](
+		context.Background(),
+		pgDB,
+		"SELECT id, nullable FROM test where id = $1;",
+		uuid.NewString(),
+	)
+
+	// Assert
+	require.ErrorIs(t, err, sql.ErrNoRows)
+	require.Empty(t, r)
+}
+
+func Test_Postgresql_QuerySingle_Returns_tqlErrMultipleResults_When_Query_Returns_Multiple_Results(t *testing.T) {
+	// Arrange
+	require.NoError(t, tql.SetActiveDriver("postgres"))
+
+	id := uuid.NewString()
+	nullable := uuid.NewString()
+
+	_, err := pgDB.Exec(
+		fmt.Sprintf(
+			"INSERT INTO test VALUES ('%s', '%s'), ('%s', '%s');",
+			id,
+			nullable,
+			uuid.NewString(),
+			nullable,
+		),
+	)
+	require.NoError(t, err)
+
+	// Act
+	r, err := tql.QuerySingle[result](
+		context.Background(),
+		pgDB,
+		"SELECT id, nullable FROM test where nullable = $1;",
+		nullable,
+	)
+
+	// Assert
+	require.ErrorIs(t, err, tql.ErrMultipleResults)
+	require.Empty(t, r)
+}
+
+func Test_Postgresql_QuerySingleOrDefault_Returns_Result_When_Query_Returns_Single_Result(t *testing.T) {
+	// Arrange
+	require.NoError(t, tql.SetActiveDriver("postgres"))
+
+	id := uuid.New()
+	nullable := uuid.New()
+
+	_, err := pgDB.Exec(fmt.Sprintf("INSERT INTO test VALUES ('%s', '%s');", id.String(), nullable.String()))
+	require.NoError(t, err)
+
+	defaultNullable := uuid.NewString()
+	d := result{
+		ID:       uuid.NewString(),
+		Nullable: &defaultNullable,
+	}
+
+	// Act
+	r, err := tql.QuerySingleOrDefault[result](
+		context.Background(),
+		pgDB,
+		d,
+		"SELECT id, nullable FROM test where id = $1;",
+		id,
+	)
+
+	// Assert
+	require.NoError(t, err)
+	require.Equal(t, id.String(), r.ID)
+	require.NotNil(t, r.Nullable)
+	require.Equal(t, nullable.String(), *r.Nullable)
+
+	require.NotEqual(t, d.ID, r.ID)
+	require.NotEqual(t, defaultNullable, *r.Nullable)
+}
+
+func Test_Postgresql_QuerySingleOrDefault_Returns_Default_When_Query_Returns_No_Results(t *testing.T) {
+	// Arrange
+	require.NoError(t, tql.SetActiveDriver("postgres"))
+
+	id := uuid.New()
+	nullable := uuid.New()
+
+	_, err := pgDB.Exec(fmt.Sprintf("INSERT INTO test VALUES ('%s', '%s');", id.String(), nullable.String()))
+	require.NoError(t, err)
+
+	defaultNullable := uuid.NewString()
+	d := result{
+		ID:       uuid.NewString(),
+		Nullable: &defaultNullable,
+	}
+
+	// Act
+	r, err := tql.QuerySingleOrDefault[result](
+		context.Background(),
+		pgDB,
+		d,
+		"SELECT id, nullable FROM test where id = $1;",
+		uuid.NewString(),
+	)
+
+	// Assert
+	require.NoError(t, err)
+	require.NotEqual(t, id.String(), r.ID)
+	require.NotEqual(t, nullable.String(), *r.Nullable)
+
+	require.Equal(t, d.ID, r.ID)
+	require.NotNil(t, r.Nullable)
+	require.Equal(t, defaultNullable, *r.Nullable)
+}
+
+func Test_Postgresql_QuerySingleOrDefault_Returns_tqlErrMultipleResults_When_Query_Returns_Multiple_Results(t *testing.T) {
+	// Arrange
+	require.NoError(t, tql.SetActiveDriver("postgres"))
+
+	id := uuid.NewString()
+	nullable := uuid.NewString()
+
+	_, err := pgDB.Exec(
+		fmt.Sprintf(
+			"INSERT INTO test VALUES ('%s', '%s'), ('%s', '%s');",
+			id,
+			nullable,
+			uuid.NewString(),
+			nullable,
+		),
+	)
+	require.NoError(t, err)
+
+	defaultNullable := uuid.NewString()
+	d := result{
+		ID:       uuid.NewString(),
+		Nullable: &defaultNullable,
+	}
+
+	// Act
+	r, err := tql.QuerySingleOrDefault[result](
+		context.Background(),
+		pgDB,
+		d,
+		"SELECT id, nullable FROM test where nullable = $1;",
+		nullable,
+	)
+
+	// Assert
+	require.ErrorIs(t, err, tql.ErrMultipleResults)
+	require.Empty(t, r)
+}
+
 func Test_Postgresql_QueryOne(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
