@@ -357,6 +357,14 @@ func isNameChar(c rune) bool {
 
 var activeDriver string
 
+func getActiveDriver() string {
+	if activeDriver == "" {
+		activeDriver = sql.Drivers()[0]
+	}
+
+	return activeDriver
+}
+
 type indicators struct {
 	named      rune
 	positional rune
@@ -393,7 +401,7 @@ func translateParams(query string, params ...any) (string, []any, error) {
 	}
 
 	// #horribleways
-	driverName := activeDriver
+	driverName := getActiveDriver()
 	pos, nam, err := parameterIndicators(driverName)
 	if err != nil {
 		return "", nil, err
@@ -459,7 +467,7 @@ func parameteriseQuery(
 			// No need for a default case here (famous last words).
 			// If there is no driver, then the execution will return
 			// an error before this part of code is executed.
-			switch activeDriver {
+			switch getActiveDriver() {
 			case "mysql", "sqlite3":
 				result.WriteRune(positionalParamIndicator)
 			case "postgres":
