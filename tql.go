@@ -28,7 +28,7 @@ var mapper = typeMapper{
 //
 // Sets which driver to use to know which parameter syntax to use.
 // Don't use this, it's global state, it's not safe for concurrent use, and it is bad.
-// It is just here so I can choose which driver I want to use in the tests for tql,
+// It is just here, so I can choose which driver I want to use in the tests for tql,
 // and the tests are in a separate module so this is public.
 func SetActiveDriver(driver string) error {
 	for _, d := range sql.Drivers() {
@@ -110,8 +110,13 @@ func QueryFirstOrDefault[T any](ctx context.Context, q Querier, def T, query str
 // Queries the table and returns the first result. If the query returns no results,
 // the function returns sql.ErrNoRows.
 func QueryFirst[T any](ctx context.Context, q Querier, query string, params ...any) (result T, err error) {
+	parameterisedQuery, args, err := translateParams(query, params...)
+	if err != nil {
+		return result, err
+	}
+
 	var rows *sql.Rows
-	rows, err = q.QueryContext(ctx, query, params...)
+	rows, err = q.QueryContext(ctx, parameterisedQuery, args...)
 	if err != nil {
 		return result, err
 	}
@@ -184,11 +189,15 @@ func QueryFirst[T any](ctx context.Context, q Querier, query string, params ...a
 // an empty slice of type T is returned. This matches the sql.QueryContext function from database/sql.
 func Query[T any](ctx context.Context, q Querier, query string, params ...any) (result []T, err error) {
 	// TODO: think about returning sql.ErrNoRows if no results are found.
-
 	result = make([]T, 0)
 
+	parameterisedQuery, args, err := translateParams(query, params...)
+	if err != nil {
+		return result, err
+	}
+
 	var rows *sql.Rows
-	rows, err = q.QueryContext(ctx, query, params...)
+	rows, err = q.QueryContext(ctx, parameterisedQuery, args...)
 	if err != nil {
 		return result, err
 	}
@@ -267,25 +276,9 @@ type Executor interface {
 // When using named parameters with structs as params, the names in the query *must* be specified as the
 // db tag in the struct name. When using a map, the keys will be the names.
 func Exec(ctx context.Context, e Executor, query string, params ...any) (sql.Result, error) {
-	parameters, err := mapParameters(params...)
+	parameterisedQuery, args, err := translateParams(query, params...)
 	if err != nil {
 		return nil, err
-	}
-
-	// #horribleways
-	driverName := activeDriver
-	pos, nam, err := parameterIndicators(driverName)
-	if err != nil {
-		return nil, err
-	}
-
-	parameterisedQuery, args, err := parameteriseQuery(pos, nam, query, parameters)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(args) < 1 {
-		args = params
 	}
 
 	return e.ExecContext(ctx, parameterisedQuery, args...)
@@ -391,6 +384,31 @@ func parameterIndicators(driverName string) (rune, rune, error) {
 		return 0, 0, fmt.Errorf("failed to find driver parameter indicator mapping")
 	}
 	return i.named, i.positional, nil
+}
+
+func translateParams(query string, params ...any) (string, []any, error) {
+	parameters, err := mapParameters(params...)
+	if err != nil {
+		return "", nil, err
+	}
+
+	// #horribleways
+	driverName := activeDriver
+	pos, nam, err := parameterIndicators(driverName)
+	if err != nil {
+		return "", nil, err
+	}
+
+	parameterisedQuery, args, err := parameteriseQuery(pos, nam, query, parameters)
+	if err != nil {
+		return "", nil, err
+	}
+
+	if len(args) < 1 {
+		args = params
+	}
+
+	return parameterisedQuery, args, nil
 }
 
 func parameteriseQuery(

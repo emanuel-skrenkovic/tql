@@ -299,6 +299,30 @@ func Test_Postgresql_QueryOne(t *testing.T) {
 	require.Equal(t, nullable.String(), *r.Nullable)
 }
 
+func Test_Postgresql_QueryOne_With_Named_Parameters(t *testing.T) {
+	// Arrange
+	require.NoError(t, tql.SetActiveDriver("postgres"))
+
+	id := uuid.New()
+	nullable := uuid.New()
+
+	_, err := pgDB.Exec(fmt.Sprintf("INSERT INTO test (id, nullable) VALUES ('%s', '%s');", id.String(), nullable.String()))
+	require.NoError(t, err)
+
+	// Act
+	r, err := tql.QueryFirst[*string](
+		context.Background(),
+		pgDB,
+		"SELECT id FROM test WHERE id = :id;",
+		map[string]any{"id": id},
+	)
+
+	// Assert
+	require.NoError(t, err)
+	require.NotNil(t, r)
+	require.Equal(t, id.String(), *r)
+}
+
 func Test_Postgresql_QueryOne_String(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
@@ -329,6 +353,30 @@ func Test_Postgresql_QueryOne_String_Pointer(t *testing.T) {
 
 	// Act
 	r, err := tql.QueryFirst[*string](context.Background(), pgDB, "SELECT id FROM test WHERE id = $1;", id)
+
+	// Assert
+	require.NoError(t, err)
+	require.NotNil(t, r)
+	require.Equal(t, id.String(), *r)
+}
+
+func Test_Postgresql_QueryOne_With_Mixed_Named_Positional_Parameters_Returns_Error(t *testing.T) {
+	// Arrange
+	require.NoError(t, tql.SetActiveDriver("postgres"))
+
+	id := uuid.New()
+	nullable := uuid.New()
+
+	_, err := pgDB.Exec(fmt.Sprintf("INSERT INTO test (id, nullable) VALUES ('%s', '%s');", id.String(), nullable.String()))
+	require.NoError(t, err)
+
+	// Act
+	r, err := tql.QueryFirst[*string](
+		context.Background(),
+		pgDB,
+		"SELECT id FROM test WHERE id = :id;",
+		map[string]any{"id": id},
+	)
 
 	// Assert
 	require.NoError(t, err)

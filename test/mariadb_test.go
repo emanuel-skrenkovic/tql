@@ -294,6 +294,30 @@ func Test_MariaDB_QueryOne(t *testing.T) {
 	require.Equal(t, nullable.String(), *r.Nullable)
 }
 
+func Test_MariaDB_QueryOne_With_Named_Parameters(t *testing.T) {
+	// Arrange
+	require.NoError(t, tql.SetActiveDriver("mysql"))
+
+	id := uuid.New()
+	nullable := uuid.New()
+
+	_, err := mariaDB.Exec(fmt.Sprintf("INSERT INTO test (id, nullable) VALUES ('%s', '%s');", id.String(), nullable.String()))
+	require.NoError(t, err)
+
+	// Act
+	r, err := tql.QueryFirst[*string](
+		context.Background(),
+		mariaDB,
+		"SELECT id FROM test WHERE id = :id;",
+		map[string]any{"id": id},
+	)
+
+	// Assert
+	require.NoError(t, err)
+	require.NotNil(t, r)
+	require.Equal(t, id.String(), *r)
+}
+
 func Test_MariaDB_QueryOne_String(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("mysql"))
