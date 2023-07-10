@@ -367,29 +367,29 @@ func getActiveDriver() string {
 
 type indicators struct {
 	named      rune
-	positional rune
+	positional []rune
 }
 
 var driverIndicators = map[string]indicators{
-	"postgres":         {named: ':', positional: '$'},
-	"pgx":              {named: ':', positional: '$'},
-	"pq-timeouts":      {named: ':', positional: '$'},
-	"cloudsqlpostgres": {named: ':', positional: '$'},
-	"ql":               {named: ':', positional: '$'},
-	"nrpostgres":       {named: ':', positional: '$'},
-	"cockroach":        {named: ':', positional: '$'},
+	"postgres":         {named: ':', positional: []rune{'$'}},
+	"pgx":              {named: ':', positional: []rune{'$'}},
+	"pq-timeouts":      {named: ':', positional: []rune{'$'}},
+	"cloudsqlpostgres": {named: ':', positional: []rune{'$'}},
+	"ql":               {named: ':', positional: []rune{'$'}},
+	"nrpostgres":       {named: ':', positional: []rune{'$'}},
+	"cockroach":        {named: ':', positional: []rune{'$'}},
 
-	"mysql":   {named: ':', positional: '?'},
-	"nrmysql": {named: ':', positional: '?'},
+	"mysql":   {named: ':', positional: []rune{'?'}},
+	"nrmysql": {named: ':', positional: []rune{'?'}},
 
-	"sqlite3":   {named: ':', positional: '?'},
-	"nrsqlite3": {named: ':', positional: '?'},
+	"sqlite3":   {named: ':', positional: []rune{'?', '$', '@'}},
+	"nrsqlite3": {named: ':', positional: []rune{'?'}},
 }
 
-func parameterIndicators(driverName string) (rune, rune, error) {
+func parameterIndicators(driverName string) (rune, []rune, error) {
 	i, found := driverIndicators[driverName]
 	if !found {
-		return 0, 0, fmt.Errorf("failed to find driver parameter indicator mapping")
+		return 0, []rune{}, fmt.Errorf("failed to find driver parameter indicator mapping")
 	}
 	return i.named, i.positional, nil
 }
@@ -421,7 +421,7 @@ func translateParams(query string, params ...any) (string, []any, error) {
 
 func parameteriseQuery(
 	namedParamIndicator rune,
-	positionalParamIndicator rune,
+	positionalParamIndicators []rune,
 	query string,
 	parameters map[string]any,
 ) (string, []any, error) {
@@ -444,8 +444,13 @@ func parameteriseQuery(
 	// Also, which token to remap to.
 
 	for _, c := range query {
-		if !hasPositional && c == positionalParamIndicator {
-			hasPositional = true
+		if !hasPositional {
+			for _, i := range positionalParamIndicators {
+				if i == c {
+					hasPositional = true
+					break
+				}
+			}
 		}
 
 		if !insideName && c == namedParamIndicator {
@@ -469,9 +474,9 @@ func parameteriseQuery(
 			// an error before this part of code is executed.
 			switch getActiveDriver() {
 			case "mysql", "sqlite3":
-				result.WriteRune(positionalParamIndicator)
+				result.WriteRune('?')
 			case "postgres":
-				result.WriteRune(positionalParamIndicator)
+				result.WriteRune('$')
 				result.Write([]byte(strconv.Itoa(currentNum)))
 			}
 			result.WriteRune(c)
