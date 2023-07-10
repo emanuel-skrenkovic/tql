@@ -12,10 +12,12 @@ import (
 var pgDB *sql.DB
 var mariaDB *sql.DB
 var sqlite3DB *sql.DB
+var oraDB *sql.DB
 
 const (
 	EnvVarNamePqDbConnectionString    = "PQ_DATABASE_URL"
 	EnvVarNameMariaDbConnectionString = "MARIADB_DATABASE_URL"
+	EnvVarNameOracleConnectionString  = "ORACLE_DATABASE_URL"
 )
 
 type result struct {
@@ -38,10 +40,16 @@ func TestMain(m *testing.M) {
 		log.Fatal("empty MARIADB_DATABASE_URL environment variable")
 	}
 
+	dbConnStringOracle := os.Getenv(EnvVarNameOracleConnectionString)
+	if dbConnStringOracle == "" {
+		log.Fatal("empty ORACLE_DATABASE_URL environment variable")
+	}
+
 	fixture, err := NewLocalTestFixture(
 		"./docker-compose.yml",
 		WithWaitDBFunc("tql-postgres", dbConnStringPG, "postgres", 5432),
 		WithWaitDBFunc("tql-mariadb", dbConnStringMariaDB, "mysql", 3306),
+		WithWaitDBFunc("tql-oracle", dbConnStringOracle, "oracle", 1521),
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -73,12 +81,21 @@ func TestMain(m *testing.M) {
 		log.Fatal(err)
 	}
 
+	oraDB, err = sql.Open("oracle", dbConnStringOracle)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	defer func() {
 		if err := pgDB.Close(); err != nil {
 			log.Printf("error closing database: %s", err.Error())
 		}
 
 		if err := mariaDB.Close(); err != nil {
+			log.Printf("error closing database: %s", err.Error())
+		}
+
+		if err := oraDB.Close(); err != nil {
 			log.Printf("error closing database: %s", err.Error())
 		}
 	}()
@@ -92,6 +109,10 @@ func TestMain(m *testing.M) {
 	}
 
 	if _, err := sqlite3DB.Exec("CREATE TABLE test (id text, nullable text);"); err != nil {
+		log.Fatal(err)
+	}
+
+	if _, err := oraDB.Exec("CREATE TABLE test (id text, nullable text);"); err != nil {
 		log.Fatal(err)
 	}
 
@@ -110,6 +131,10 @@ func TestMain(m *testing.M) {
 	}
 
 	if _, err := sqlite3DB.Exec("DROP TABLE test;"); err != nil {
+		log.Println(err)
+	}
+
+	if _, err := oraDB.Exec("DROP TABLE test;"); err != nil {
 		log.Println(err)
 	}
 
