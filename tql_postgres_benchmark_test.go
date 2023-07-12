@@ -1,9 +1,14 @@
 package tql
 
-import "testing"
+import (
+	"arena"
+	"testing"
+)
 
 func Benchmark_Postgres_ParameteriseQuery(b *testing.B) {
 	b.StopTimer()
+	activeDriver = "postgres"
+
 	n, p, err := parameterIndicators("postgres")
 	if err != nil {
 		b.Fatalf("unexpected error: %s", err.Error())
@@ -18,15 +23,21 @@ func Benchmark_Postgres_ParameteriseQuery(b *testing.B) {
 	am := t{"Emanuel Skrenkovic", 30, "Emanuel", "Skrenkovic"}
 
 	const query = "INSERT INTO foo (a, b, c, d) VALUES (:name, :age, :first, :last)"
+	a := arena.NewArena()
+
+	args, _ := bindArgs(a, am)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		args, _ := bindArgs(am)
-		_, _, _ = parameteriseQuery(n, p, query, args)
+		_, _, _ = parameteriseQuery(a, n, p, query, args)
 	}
+
+	b.StopTimer()
+	a.Free()
 }
 
 func Benchmark_Postgres_bindArgs_Struct(b *testing.B) {
 	b.StopTimer()
+	activeDriver = "postgres"
 	type t struct {
 		Name  string `db:"name"`
 		Age   int    `db:"age"`
@@ -35,10 +46,14 @@ func Benchmark_Postgres_bindArgs_Struct(b *testing.B) {
 	}
 	am := t{"Emanuel Skrenkovic", 30, "Emanuel", "Skrenkovic"}
 
+	a := arena.NewArena()
+
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = bindArgs(am)
+		_, _ = bindArgs(a, am)
 	}
+	b.StopTimer()
+	a.Free()
 }
 
 func Benchmark_Postgres_createDestinations(b *testing.B) {
@@ -57,14 +72,19 @@ func Benchmark_Postgres_createDestinations(b *testing.B) {
 	}
 	am := t{"Emanuel Skrenkovic", 30, "Emanuel", "Skrenkovic"}
 
+	a := arena.NewArena()
+
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = createDestinations(&am, cols)
+		_, _ = createDestinations(a, &am, cols)
 	}
+	b.StopTimer()
+	a.Free()
 }
 
 func Benchmark_Postgres_mapParameters_Struct(b *testing.B) {
 	b.StopTimer()
+	activeDriver = "postgres"
 	type t struct {
 		Name  string `db:"name"`
 		Age   int    `db:"age"`
@@ -72,14 +92,20 @@ func Benchmark_Postgres_mapParameters_Struct(b *testing.B) {
 		Last  string `db:"last"`
 	}
 	am := t{"Emanuel Skrenkovic", 30, "Emanuel", "Skrenkovic"}
+
+	a := arena.NewArena()
+
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = mapParameters(am)
+		_, _ = mapParameters(a, am)
 	}
+
+	a.Free()
 }
 
 func Benchmark_Postgres_mapParameters_Map(b *testing.B) {
 	b.StopTimer()
+	activeDriver = "postgres"
 	type t struct {
 		Name  string `db:"name"`
 		Age   int    `db:"age"`
@@ -92,8 +118,13 @@ func Benchmark_Postgres_mapParameters_Map(b *testing.B) {
 		"first": "Emanuel",
 		"last":  "Skrenkovic",
 	}
+
+	a := arena.NewArena()
+
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = mapParameters(am)
+		_, _ = mapParameters(a, am)
 	}
+
+	a.Free()
 }

@@ -1,6 +1,9 @@
+//go:build goexperiment.arenas
+
 package tql
 
 import (
+	"arena"
 	"context"
 	"database/sql"
 	"database/sql/driver"
@@ -8,8 +11,8 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
-	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 var ErrMultipleResults = errors.New("sql: found multiple results expected single")
@@ -110,7 +113,10 @@ func QueryFirstOrDefault[T any](ctx context.Context, q Querier, def T, query str
 // Queries the table and returns the first result. If the query returns no results,
 // the function returns sql.ErrNoRows.
 func QueryFirst[T any](ctx context.Context, q Querier, query string, params ...any) (result T, err error) {
-	parameterisedQuery, args, err := translateParams(query, params...)
+	a := arena.NewArena()
+	defer a.Free()
+
+	parameterisedQuery, args, err := translateParams(a, query, params...)
 	if err != nil {
 		return result, err
 	}
@@ -153,7 +159,7 @@ func QueryFirst[T any](ctx context.Context, q Querier, query string, params ...a
 		}
 
 		var dest []any
-		dest, err = createDestinations(&result, cols)
+		dest, err = createDestinations(a, &result, cols)
 		if err != nil {
 			return result, err
 		}
@@ -188,15 +194,18 @@ func QueryFirst[T any](ctx context.Context, q Querier, query string, params ...a
 // Queries the database and returns all the results as a slice. If the query returns no results,
 // an empty slice of type T is returned. This matches the sql.QueryContext function from database/sql.
 func Query[T any](ctx context.Context, q Querier, query string, params ...any) (result []T, err error) {
-	// TODO: think about returning sql.ErrNoRows if no results are found.
-	result = make([]T, 0)
+	a := arena.NewArena()
+	defer a.Free()
 
-	parameterisedQuery, args, err := translateParams(query, params...)
+	// TODO: think about returning sql.ErrNoRows if no results are found.
+	result = arena.MakeSlice[T](a, 0, 100)
+
+	parameterisedQuery, args, err := translateParams(a, query, params...)
 	if err != nil {
 		return result, err
 	}
 
-	var rows *sql.Rows
+	rows := arena.New[sql.Rows](a)
 	rows, err = q.QueryContext(ctx, parameterisedQuery, args...)
 	if err != nil {
 		return result, err
@@ -231,7 +240,7 @@ func Query[T any](ctx context.Context, q Querier, query string, params ...any) (
 			}
 
 			var dest []any
-			dest, err = createDestinations(&current, cols)
+			dest, err = createDestinations(a, &current, cols)
 			if err != nil {
 				return result, err
 			}
@@ -259,7 +268,7 @@ func Query[T any](ctx context.Context, q Querier, query string, params ...any) (
 		result = append(result, current)
 	}
 
-	return result, err
+	return arena.Clone(result), err
 }
 
 type Executor interface {
@@ -276,7 +285,9 @@ type Executor interface {
 // When using named parameters with structs as params, the names in the query *must* be specified as the
 // db tag in the struct name. When using a map, the keys will be the names.
 func Exec(ctx context.Context, e Executor, query string, params ...any) (sql.Result, error) {
-	parameterisedQuery, args, err := translateParams(query, params...)
+	a := arena.NewArena()
+
+	parameterisedQuery, args, err := translateParams(a, query, params...)
 	if err != nil {
 		return nil, err
 	}
@@ -284,8 +295,8 @@ func Exec(ctx context.Context, e Executor, query string, params ...any) (sql.Res
 	return e.ExecContext(ctx, parameterisedQuery, args...)
 }
 
-func mapParameters(params ...any) (map[string]any, error) {
-	parameters := make(map[string]any)
+func mapParameters(a *arena.Arena, params ...any) (map[string]any, error) {
+	parameters := make(map[string]any, len(params))
 
 ParamLoop:
 	for _, p := range params {
@@ -317,7 +328,7 @@ ParamLoop:
 
 			fieldTags, found := typeFieldDbTags[typeName]
 			if !found {
-				fieldTags = make([]string, fieldsCount)
+				fieldTags = arena.MakeSlice[string](a, fieldsCount, fieldsCount)
 				typeFieldDbTags[typeName] = fieldTags
 
 				for i := 0; i < fieldsCount; i++ {
@@ -394,8 +405,8 @@ func parameterIndicators(driverName string) (rune, rune, error) {
 	return i.named, i.positional, nil
 }
 
-func translateParams(query string, params ...any) (string, []any, error) {
-	parameters, err := mapParameters(params...)
+func translateParams(a *arena.Arena, query string, params ...any) (string, []any, error) {
+	parameters, err := mapParameters(a, params...)
 	if err != nil {
 		return "", nil, err
 	}
@@ -407,7 +418,7 @@ func translateParams(query string, params ...any) (string, []any, error) {
 		return "", nil, err
 	}
 
-	parameterisedQuery, args, err := parameteriseQuery(pos, nam, query, parameters)
+	parameterisedQuery, args, err := parameteriseQuery(a, pos, nam, query, parameters)
 	if err != nil {
 		return "", nil, err
 	}
@@ -420,6 +431,7 @@ func translateParams(query string, params ...any) (string, []any, error) {
 }
 
 func parameteriseQuery(
+	a *arena.Arena,
 	namedParamIndicator rune,
 	positionalParamIndicator rune,
 	query string,
@@ -429,14 +441,12 @@ func parameteriseQuery(
 		insideName    bool
 		hasPositional bool
 
-		result     strings.Builder
-		resultArgs = make([]any, 0, len(parameters))
+		result     = arena.MakeSlice[byte](a, 0, len(query))
+		resultArgs = arena.MakeSlice[any](a, 0, len(parameters))
 
-		currentName strings.Builder
+		currentName = arena.MakeSlice[byte](a, 0, 63)
 		currentNum  int
 	)
-
-	result.Grow(len(query))
 
 	// TODO: inside name has to know the connection type to
 	// properly decide on which token to use as the namedIndicator
@@ -449,15 +459,15 @@ func parameteriseQuery(
 		}
 
 		if !insideName && c == namedParamIndicator {
-			currentName.Reset()
+			currentName = arena.MakeSlice[byte](a, 0, 20)
 			insideName = true
 			continue
 		}
 
 		if insideName && !isNameChar(c) {
-			arg, found := parameters[currentName.String()]
+			arg, found := parameters[string(currentName)]
 			if !found {
-				return "", []any{}, fmt.Errorf("query parameter '%s' not found in provided parameters", currentName.String())
+				return "", []any{}, fmt.Errorf("query parameter '%s' not found in provided parameters", string(currentName))
 			}
 			resultArgs = append(resultArgs, arg)
 
@@ -469,38 +479,39 @@ func parameteriseQuery(
 			// an error before this part of code is executed.
 			switch getActiveDriver() {
 			case "mysql", "sqlite3":
-				result.WriteRune(positionalParamIndicator)
+				result = utf8.AppendRune(result, positionalParamIndicator)
 			case "postgres":
-				result.WriteRune(positionalParamIndicator)
-				result.Write([]byte(strconv.Itoa(currentNum)))
+				result = utf8.AppendRune(result, positionalParamIndicator)
+				result = append(result, []byte(strconv.Itoa(currentNum))...)
 			}
-			result.WriteRune(c)
+			result = utf8.AppendRune(result, c)
 			continue
 		}
 
 		if insideName {
-			currentName.WriteRune(c)
+			currentName = utf8.AppendRune(currentName, c)
 			continue
 		}
 
-		result.WriteRune(c)
+		result = utf8.AppendRune(result, c)
 	}
 
 	if hasPositional && len(resultArgs) > 0 {
 		return "", []any{}, fmt.Errorf("mixed positional and named parameters")
 	}
 
-	return result.String(), resultArgs, nil
+	return string(result), resultArgs, nil
 }
 
 // TODO: candidate for caching
-func createDestinations(source any, columns []string) ([]any, error) {
+func createDestinations(a *arena.Arena, source any, columns []string) ([]any, error) {
 	value := reflect.ValueOf(source).Elem()
 	valueType := value.Type()
 
 	typeName := valueType.Name()
 	if indices, found := mapper.typeFieldCache[typeName]; found {
-		dest := make([]any, len(columns))
+		//dest := make([]any, len(columns))
+		dest := arena.MakeSlice[any](a, len(columns), len(columns))
 		for i, c := range columns {
 			fieldIdx, found := indices[c]
 			if !found {
@@ -530,7 +541,7 @@ func createDestinations(source any, columns []string) ([]any, error) {
 		indices[tag] = i
 	}
 
-	dest := make([]any, len(columns))
+	dest := arena.MakeSlice[any](a, len(columns), len(columns))
 	for i, c := range columns {
 		fieldIdx, found := indices[c]
 		if !found {
@@ -558,8 +569,9 @@ func createDestinations(source any, columns []string) ([]any, error) {
 // tagName := typeFieldDbTags[typeName][fieldNumber]
 var typeFieldDbTags = make(map[string][]string)
 
-func bindArgs(params ...any) (map[string]any, error) {
+func bindArgs(a *arena.Arena, params ...any) (map[string]any, error) {
 	parameters := make(map[string]any)
+
 	for _, p := range params {
 		val := reflect.ValueOf(p)
 
@@ -586,8 +598,8 @@ func bindArgs(params ...any) (map[string]any, error) {
 
 			fieldTags, found := typeFieldDbTags[typeName]
 			if !found {
-				fieldTags = make([]string, fieldsCount)
-				typeFieldDbTags[typeName] = fieldTags
+				fieldTags = arena.MakeSlice[string](a, fieldsCount, fieldsCount)
+				typeFieldDbTags[typeName] = arena.Clone(fieldTags)
 
 				for i := 0; i < fieldsCount; i++ {
 					field := valueType.Field(i)
