@@ -132,8 +132,7 @@ func QueryFirst[T any](ctx context.Context, q Querier, query string, params ...a
 		}
 
 		if closeErr := rows.Close(); closeErr != nil {
-			// #horribleways
-			err = fmt.Errorf("failed to close rows: %w", closeErr)
+			err = errors.Join(closeErr, err)
 		}
 	}()
 
@@ -211,9 +210,8 @@ func Query[T any](ctx context.Context, q Querier, query string, params ...any) (
 			return
 		}
 
-		if err = rows.Close(); err != nil {
-			// #horribleways
-			err = fmt.Errorf("failed to close rows: %w", err)
+		if closeErr := rows.Close(); closeErr != nil {
+			err = errors.Join(closeErr, err)
 		}
 	}()
 
