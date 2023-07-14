@@ -80,12 +80,6 @@ func Benchmark_Postgres_mapParameters_Struct(b *testing.B) {
 
 func Benchmark_Postgres_mapParameters_Map(b *testing.B) {
 	b.StopTimer()
-	type t struct {
-		Name  string `db:"name"`
-		Age   int    `db:"age"`
-		First string `db:"first"`
-		Last  string `db:"last"`
-	}
 	am := map[string]any{
 		"name":  "Emanuel Skrenkovic",
 		"age":   30,
