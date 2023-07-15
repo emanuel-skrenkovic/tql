@@ -14,12 +14,14 @@ import (
 )
 
 var pgDB *sql.DB
+var cockroachDB *sql.DB
 var mariaDB *sql.DB
 var sqlite3DB *sql.DB
 
 const (
-	EnvVarNamePqDbConnectionString    = "PQ_DATABASE_URL"
-	EnvVarNameMariaDbConnectionString = "MARIADB_DATABASE_URL"
+	EnvVarNamePqDbConnectionString        = "PQ_DATABASE_URL"
+	EnvVarNameMariaDbConnectionString     = "MARIADB_DATABASE_URL"
+	EnvVarNameCockroachDBConnectionString = "COCKROACH_DB_DATABASE_URL"
 )
 
 type result struct {
@@ -42,9 +44,15 @@ func TestMain(m *testing.M) {
 		log.Fatal("empty MARIADB_DATABASE_URL environment variable")
 	}
 
+	dbConnStringCockroachDB := os.Getenv(EnvVarNameCockroachDBConnectionString)
+	if dbConnStringCockroachDB == "" {
+		log.Fatal("empty COCKROACH_DB_DATABASE_URL environment variable")
+	}
+
 	fixture, err := NewLocalTestFixture(
 		"./docker-compose.yml",
 		WithWaitDBFunc("tql-postgres", dbConnStringPG, "postgres", 5432),
+		WithWaitDBFunc("tql-cockroachdb", dbConnStringCockroachDB, "postgres", 26257),
 		WithWaitDBFunc("tql-mariadb", dbConnStringMariaDB, "mysql", 3306),
 	)
 	if err != nil {
@@ -67,6 +75,11 @@ func TestMain(m *testing.M) {
 		log.Fatal(err)
 	}
 
+	cockroachDB, err = sql.Open("postgres", dbConnStringCockroachDB)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	mariaDB, err = sql.Open("mysql", dbConnStringMariaDB)
 	if err != nil {
 		log.Fatal(err)
@@ -82,12 +95,24 @@ func TestMain(m *testing.M) {
 			log.Printf("error closing database: %s", err.Error())
 		}
 
+		if err := cockroachDB.Close(); err != nil {
+			log.Printf("error closing database: %s", err.Error())
+		}
+
 		if err := mariaDB.Close(); err != nil {
+			log.Printf("error closing database: %s", err.Error())
+		}
+
+		if err := sqlite3DB.Close(); err != nil {
 			log.Printf("error closing database: %s", err.Error())
 		}
 	}()
 
 	if _, err := pgDB.Exec("CREATE TABLE test (id text, nullable text);"); err != nil {
+		log.Fatal(err)
+	}
+
+	if _, err := cockroachDB.Exec("CREATE TABLE test (id text, nullable text);"); err != nil {
 		log.Fatal(err)
 	}
 
@@ -106,6 +131,10 @@ func TestMain(m *testing.M) {
 	}
 
 	if _, err := pgDB.Exec("DROP TABLE test;"); err != nil {
+		log.Println(err)
+	}
+
+	if _, err := cockroachDB.Exec("DROP TABLE test;"); err != nil {
 		log.Println(err)
 	}
 
