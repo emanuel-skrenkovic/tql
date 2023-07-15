@@ -10,12 +10,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-
-	_ "github.com/go-sql-driver/mysql"
-	_ "github.com/lib/pq"
 )
 
-func Test_Postgresql_QueryFirstOrDefault_Returns_First_Result(t *testing.T) {
+func Test_Postgresql_pq_QueryFirstOrDefault_Returns_First_Result(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
 
@@ -30,7 +27,13 @@ func Test_Postgresql_QueryFirstOrDefault_Returns_First_Result(t *testing.T) {
 	}
 
 	// Act
-	r, err := tql.QueryFirstOrDefault[result](context.Background(), pgDB, d, "SELECT id, nullable FROM test;")
+	r, err := tql.QueryFirstOrDefault[result](
+		context.Background(),
+		pgDB,
+		d,
+		"SELECT id, nullable FROM test WHERE id = $1;",
+		id,
+	)
 
 	// Assert
 	require.NoError(t, err)
@@ -41,7 +44,7 @@ func Test_Postgresql_QueryFirstOrDefault_Returns_First_Result(t *testing.T) {
 	require.NotEqual(t, d.ID, r.ID)
 }
 
-func Test_Postgresql_QueryFirstOrDefault_Returns_Default_When_Query_Returns_No_Results(t *testing.T) {
+func Test_Postgresql_pq_QueryFirstOrDefault_Returns_Default_When_Query_Returns_No_Results(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
 
@@ -76,7 +79,7 @@ func Test_Postgresql_QueryFirstOrDefault_Returns_Default_When_Query_Returns_No_R
 	require.Equal(t, defaultNullable, *r.Nullable)
 }
 
-func Test_Postgresql_QueryFirstOrDefault_Returns_First_Result_When_Query_Returns_Multiple_Results(t *testing.T) {
+func Test_Postgresql_pq_QueryFirstOrDefault_Returns_First_Result_When_Query_Returns_Multiple_Results(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
 
@@ -117,7 +120,7 @@ func Test_Postgresql_QueryFirstOrDefault_Returns_First_Result_When_Query_Returns
 	require.NotEqual(t, defaultNullable, *r.Nullable)
 }
 
-func Test_Postgresql_QuerySingle_Returns_sqlErrNoRows_When_Query_Returns_No_Results(t *testing.T) {
+func Test_Postgresql_pq_QuerySingle_Returns_sqlErrNoRows_When_Query_Returns_No_Results(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
 
@@ -140,7 +143,7 @@ func Test_Postgresql_QuerySingle_Returns_sqlErrNoRows_When_Query_Returns_No_Resu
 	require.Empty(t, r)
 }
 
-func Test_Postgresql_QuerySingle_Returns_tqlErrMultipleResults_When_Query_Returns_Multiple_Results(t *testing.T) {
+func Test_Postgresql_pq_QuerySingle_Returns_tqlErrMultipleResults_When_Query_Returns_Multiple_Results(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
 
@@ -171,7 +174,7 @@ func Test_Postgresql_QuerySingle_Returns_tqlErrMultipleResults_When_Query_Return
 	require.Empty(t, r)
 }
 
-func Test_Postgresql_QuerySingleOrDefault_Returns_Result_When_Query_Returns_Single_Result(t *testing.T) {
+func Test_Postgresql_pq_QuerySingleOrDefault_Returns_Result_When_Query_Returns_Single_Result(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
 
@@ -206,7 +209,7 @@ func Test_Postgresql_QuerySingleOrDefault_Returns_Result_When_Query_Returns_Sing
 	require.NotEqual(t, defaultNullable, *r.Nullable)
 }
 
-func Test_Postgresql_QuerySingleOrDefault_Returns_Default_When_Query_Returns_No_Results(t *testing.T) {
+func Test_Postgresql_pq_QuerySingleOrDefault_Returns_Default_When_Query_Returns_No_Results(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
 
@@ -241,7 +244,7 @@ func Test_Postgresql_QuerySingleOrDefault_Returns_Default_When_Query_Returns_No_
 	require.Equal(t, defaultNullable, *r.Nullable)
 }
 
-func Test_Postgresql_QuerySingleOrDefault_Returns_tqlErrMultipleResults_When_Query_Returns_Multiple_Results(t *testing.T) {
+func Test_Postgresql_pq_QuerySingleOrDefault_Returns_tqlErrMultipleResults_When_Query_Returns_Multiple_Results(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
 
@@ -279,7 +282,7 @@ func Test_Postgresql_QuerySingleOrDefault_Returns_tqlErrMultipleResults_When_Que
 	require.Empty(t, r)
 }
 
-func Test_Postgresql_QueryOne(t *testing.T) {
+func Test_Postgresql_pq_QueryOne(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
 
@@ -299,7 +302,7 @@ func Test_Postgresql_QueryOne(t *testing.T) {
 	require.Equal(t, nullable.String(), *r.Nullable)
 }
 
-func Test_Postgresql_QueryOne_With_Named_Parameters(t *testing.T) {
+func Test_Postgresql_pq_QueryOne_With_Named_Parameters(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
 
@@ -323,7 +326,7 @@ func Test_Postgresql_QueryOne_With_Named_Parameters(t *testing.T) {
 	require.Equal(t, id.String(), *r)
 }
 
-func Test_Postgresql_QueryOne_String(t *testing.T) {
+func Test_Postgresql_pq_QueryOne_String(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
 
@@ -341,7 +344,7 @@ func Test_Postgresql_QueryOne_String(t *testing.T) {
 	require.Equal(t, id.String(), r)
 }
 
-func Test_Postgresql_QueryOne_String_Pointer(t *testing.T) {
+func Test_Postgresql_pq_QueryOne_String_Pointer(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
 
@@ -360,7 +363,7 @@ func Test_Postgresql_QueryOne_String_Pointer(t *testing.T) {
 	require.Equal(t, id.String(), *r)
 }
 
-func Test_Postgresql_QueryOne_With_Mixed_Named_Positional_Parameters_Returns_Error(t *testing.T) {
+func Test_Postgresql_pq_QueryOne_With_Mixed_Named_Positional_Parameters_Returns_Error(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
 
@@ -384,7 +387,7 @@ func Test_Postgresql_QueryOne_With_Mixed_Named_Positional_Parameters_Returns_Err
 	require.Equal(t, id.String(), *r)
 }
 
-func Test_Postgresql_QueryOne_Int_Pointer(t *testing.T) {
+func Test_Postgresql_pq_QueryOne_Int_Pointer(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
 
@@ -403,7 +406,7 @@ func Test_Postgresql_QueryOne_Int_Pointer(t *testing.T) {
 	require.Equal(t, 420, *r)
 }
 
-func Test_Postgresql_Query(t *testing.T) {
+func Test_Postgresql_pq_Query(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
 
@@ -441,7 +444,7 @@ func Test_Postgresql_Query(t *testing.T) {
 	}
 }
 
-func Test_Postgresql_Query_Basic_Type_From_Tx(t *testing.T) {
+func Test_Postgresql_pq_Query_Basic_Type_From_Tx(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
 
@@ -473,7 +476,7 @@ func Test_Postgresql_Query_Basic_Type_From_Tx(t *testing.T) {
 	require.Equal(t, id, r)
 }
 
-func Test_Postgresql_Query_Basic_Type_Pointer(t *testing.T) {
+func Test_Postgresql_pq_Query_Basic_Type_Pointer(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
 
@@ -501,7 +504,7 @@ func Test_Postgresql_Query_Basic_Type_Pointer(t *testing.T) {
 	require.Equal(t, id, *r)
 }
 
-func Test_Postgresql_Query_Basic_Type_Pointer_Null(t *testing.T) {
+func Test_Postgresql_pq_Query_Basic_Type_Pointer_Null(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
 
@@ -513,7 +516,7 @@ func Test_Postgresql_Query_Basic_Type_Pointer_Null(t *testing.T) {
 	require.Nil(t, r)
 }
 
-func Test_Postgresql_Query_Empty_Result(t *testing.T) {
+func Test_Postgresql_pq_Query_Empty_Result(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
 
@@ -528,7 +531,7 @@ func Test_Postgresql_Query_Empty_Result(t *testing.T) {
 	require.NotNil(t, r)
 }
 
-func Test_Postgresql_Exec(t *testing.T) {
+func Test_Postgresql_pq_Exec(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
 
@@ -550,7 +553,7 @@ func Test_Postgresql_Exec(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func Test_Postgresql_Exec_With_Struct(t *testing.T) {
+func Test_Postgresql_pq_Exec_With_Struct(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
 
@@ -578,7 +581,7 @@ func Test_Postgresql_Exec_With_Struct(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func Test_Postgresql_Exec_Not_Named(t *testing.T) {
+func Test_Postgresql_pq_Exec_Not_Named(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
 
@@ -600,7 +603,7 @@ func Test_Postgresql_Exec_Not_Named(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func Test_Postgresql_Exec_Mixed_Named_Positional(t *testing.T) {
+func Test_Postgresql_pq_Exec_Mixed_Named_Positional(t *testing.T) {
 	// Arrange
 	require.NoError(t, tql.SetActiveDriver("postgres"))
 

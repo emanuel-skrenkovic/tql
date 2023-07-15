@@ -468,7 +468,7 @@ func parameteriseQuery(
 			switch getActiveDriver() {
 			case "mysql", "sqlite3":
 				result.WriteRune(positionalParamIndicator)
-			case "postgres":
+			case "postgres", "pgx":
 				result.WriteRune(positionalParamIndicator)
 				result.Write([]byte(strconv.Itoa(currentNum)))
 			}
