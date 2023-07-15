@@ -12,14 +12,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_CockroachDB_pq_QueryFirstOrDefault_Returns_First_Result(t *testing.T) {
+func Test_CockroachDB_pgx_QueryFirstOrDefault_Returns_First_Result(t *testing.T) {
 	// Arrange
-	require.NoError(t, tql.SetActiveDriver("postgres"))
+	require.NoError(t, tql.SetActiveDriver("pgx"))
 
 	id := uuid.New()
 	nullable := uuid.New()
 
-	_, err := cockroachPqDB.Exec(fmt.Sprintf("INSERT INTO test VALUES ('%s', '%s');", id.String(), nullable.String()))
+	_, err := cockroachPgxDB.Exec(fmt.Sprintf("INSERT INTO test VALUES ('%s', '%s');", id.String(), nullable.String()))
 	require.NoError(t, err)
 
 	d := result{
@@ -29,7 +29,7 @@ func Test_CockroachDB_pq_QueryFirstOrDefault_Returns_First_Result(t *testing.T) 
 	// Act
 	r, err := tql.QueryFirstOrDefault[result](
 		context.Background(),
-		cockroachPqDB,
+		cockroachPgxDB,
 		d,
 		"SELECT id, nullable FROM test WHERE id = $1;",
 		id,
@@ -44,14 +44,14 @@ func Test_CockroachDB_pq_QueryFirstOrDefault_Returns_First_Result(t *testing.T) 
 	require.NotEqual(t, d.ID, r.ID)
 }
 
-func Test_CockroachDB_pq_QueryFirstOrDefault_Returns_Default_When_Query_Returns_No_Results(t *testing.T) {
+func Test_CockroachDB_pgx_QueryFirstOrDefault_Returns_Default_When_Query_Returns_No_Results(t *testing.T) {
 	// Arrange
-	require.NoError(t, tql.SetActiveDriver("postgres"))
+	require.NoError(t, tql.SetActiveDriver("pgx"))
 
 	id := uuid.New()
 	nullable := uuid.New()
 
-	_, err := cockroachPqDB.Exec(fmt.Sprintf("INSERT INTO test VALUES ('%s', '%s');", id.String(), nullable.String()))
+	_, err := cockroachPgxDB.Exec(fmt.Sprintf("INSERT INTO test VALUES ('%s', '%s');", id.String(), nullable.String()))
 	require.NoError(t, err)
 
 	defaultNullable := uuid.NewString()
@@ -63,7 +63,7 @@ func Test_CockroachDB_pq_QueryFirstOrDefault_Returns_Default_When_Query_Returns_
 	// Act
 	r, err := tql.QueryFirstOrDefault[result](
 		context.Background(),
-		cockroachPqDB,
+		cockroachPgxDB,
 		d,
 		"SELECT id, nullable FROM test where id = $1;",
 		uuid.NewString(),
@@ -79,14 +79,14 @@ func Test_CockroachDB_pq_QueryFirstOrDefault_Returns_Default_When_Query_Returns_
 	require.Equal(t, defaultNullable, *r.Nullable)
 }
 
-func Test_CockroachDB_pq_QueryFirstOrDefault_Returns_First_Result_When_Query_Returns_Multiple_Results(t *testing.T) {
+func Test_CockroachDB_pgx_QueryFirstOrDefault_Returns_First_Result_When_Query_Returns_Multiple_Results(t *testing.T) {
 	// Arrange
-	require.NoError(t, tql.SetActiveDriver("postgres"))
+	require.NoError(t, tql.SetActiveDriver("pgx"))
 
 	id := uuid.NewString()
 	nullable := uuid.NewString()
 
-	_, err := cockroachPqDB.Exec(
+	_, err := cockroachPgxDB.Exec(
 		fmt.Sprintf(
 			"INSERT INTO test VALUES ('%s', '%s'), ('%s', '%s');",
 			id,
@@ -106,7 +106,7 @@ func Test_CockroachDB_pq_QueryFirstOrDefault_Returns_First_Result_When_Query_Ret
 	// Act
 	r, err := tql.QueryFirstOrDefault[result](
 		context.Background(),
-		cockroachPqDB,
+		cockroachPgxDB,
 		d,
 		"SELECT id, nullable FROM test where nullable = $1;",
 		nullable,
@@ -120,20 +120,20 @@ func Test_CockroachDB_pq_QueryFirstOrDefault_Returns_First_Result_When_Query_Ret
 	require.NotEqual(t, defaultNullable, *r.Nullable)
 }
 
-func Test_CockroachDB_pq_QuerySingle_Returns_sqlErrNoRows_When_Query_Returns_No_Results(t *testing.T) {
+func Test_CockroachDB_pgx_QuerySingle_Returns_sqlErrNoRows_When_Query_Returns_No_Results(t *testing.T) {
 	// Arrange
-	require.NoError(t, tql.SetActiveDriver("postgres"))
+	require.NoError(t, tql.SetActiveDriver("pgx"))
 
 	id := uuid.New()
 	nullable := uuid.New()
 
-	_, err := cockroachPqDB.Exec(fmt.Sprintf("INSERT INTO test VALUES ('%s', '%s');", id.String(), nullable.String()))
+	_, err := cockroachPgxDB.Exec(fmt.Sprintf("INSERT INTO test VALUES ('%s', '%s');", id.String(), nullable.String()))
 	require.NoError(t, err)
 
 	// Act
 	r, err := tql.QuerySingle[result](
 		context.Background(),
-		cockroachPqDB,
+		cockroachPgxDB,
 		"SELECT id, nullable FROM test where id = $1;",
 		uuid.NewString(),
 	)
@@ -143,14 +143,14 @@ func Test_CockroachDB_pq_QuerySingle_Returns_sqlErrNoRows_When_Query_Returns_No_
 	require.Empty(t, r)
 }
 
-func Test_CockroachDB_pq_QuerySingle_Returns_tqlErrMultipleResults_When_Query_Returns_Multiple_Results(t *testing.T) {
+func Test_CockroachDB_pgx_QuerySingle_Returns_tqlErrMultipleResults_When_Query_Returns_Multiple_Results(t *testing.T) {
 	// Arrange
-	require.NoError(t, tql.SetActiveDriver("postgres"))
+	require.NoError(t, tql.SetActiveDriver("pgx"))
 
 	id := uuid.NewString()
 	nullable := uuid.NewString()
 
-	_, err := cockroachPqDB.Exec(
+	_, err := cockroachPgxDB.Exec(
 		fmt.Sprintf(
 			"INSERT INTO test VALUES ('%s', '%s'), ('%s', '%s');",
 			id,
@@ -164,7 +164,7 @@ func Test_CockroachDB_pq_QuerySingle_Returns_tqlErrMultipleResults_When_Query_Re
 	// Act
 	r, err := tql.QuerySingle[result](
 		context.Background(),
-		cockroachPqDB,
+		cockroachPgxDB,
 		"SELECT id, nullable FROM test where nullable = $1;",
 		nullable,
 	)
@@ -174,14 +174,14 @@ func Test_CockroachDB_pq_QuerySingle_Returns_tqlErrMultipleResults_When_Query_Re
 	require.Empty(t, r)
 }
 
-func Test_CockroachDB_pq_QuerySingleOrDefault_Returns_Result_When_Query_Returns_Single_Result(t *testing.T) {
+func Test_CockroachDB_pgx_QuerySingleOrDefault_Returns_Result_When_Query_Returns_Single_Result(t *testing.T) {
 	// Arrange
-	require.NoError(t, tql.SetActiveDriver("postgres"))
+	require.NoError(t, tql.SetActiveDriver("pgx"))
 
 	id := uuid.New()
 	nullable := uuid.New()
 
-	_, err := cockroachPqDB.Exec(fmt.Sprintf("INSERT INTO test VALUES ('%s', '%s');", id.String(), nullable.String()))
+	_, err := cockroachPgxDB.Exec(fmt.Sprintf("INSERT INTO test VALUES ('%s', '%s');", id.String(), nullable.String()))
 	require.NoError(t, err)
 
 	defaultNullable := uuid.NewString()
@@ -193,7 +193,7 @@ func Test_CockroachDB_pq_QuerySingleOrDefault_Returns_Result_When_Query_Returns_
 	// Act
 	r, err := tql.QuerySingleOrDefault[result](
 		context.Background(),
-		cockroachPqDB,
+		cockroachPgxDB,
 		d,
 		"SELECT id, nullable FROM test where id = $1;",
 		id,
@@ -209,14 +209,14 @@ func Test_CockroachDB_pq_QuerySingleOrDefault_Returns_Result_When_Query_Returns_
 	require.NotEqual(t, defaultNullable, *r.Nullable)
 }
 
-func Test_CockroachDB_pq_QuerySingleOrDefault_Returns_Default_When_Query_Returns_No_Results(t *testing.T) {
+func Test_CockroachDB_pgx_QuerySingleOrDefault_Returns_Default_When_Query_Returns_No_Results(t *testing.T) {
 	// Arrange
-	require.NoError(t, tql.SetActiveDriver("postgres"))
+	require.NoError(t, tql.SetActiveDriver("pgx"))
 
 	id := uuid.New()
 	nullable := uuid.New()
 
-	_, err := cockroachPqDB.Exec(fmt.Sprintf("INSERT INTO test VALUES ('%s', '%s');", id.String(), nullable.String()))
+	_, err := cockroachPgxDB.Exec(fmt.Sprintf("INSERT INTO test VALUES ('%s', '%s');", id.String(), nullable.String()))
 	require.NoError(t, err)
 
 	defaultNullable := uuid.NewString()
@@ -228,7 +228,7 @@ func Test_CockroachDB_pq_QuerySingleOrDefault_Returns_Default_When_Query_Returns
 	// Act
 	r, err := tql.QuerySingleOrDefault[result](
 		context.Background(),
-		cockroachPqDB,
+		cockroachPgxDB,
 		d,
 		"SELECT id, nullable FROM test where id = $1;",
 		uuid.NewString(),
@@ -244,14 +244,14 @@ func Test_CockroachDB_pq_QuerySingleOrDefault_Returns_Default_When_Query_Returns
 	require.Equal(t, defaultNullable, *r.Nullable)
 }
 
-func Test_CockroachDB_pq_QuerySingleOrDefault_Returns_tqlErrMultipleResults_When_Query_Returns_Multiple_Results(t *testing.T) {
+func Test_CockroachDB_pgx_QuerySingleOrDefault_Returns_tqlErrMultipleResults_When_Query_Returns_Multiple_Results(t *testing.T) {
 	// Arrange
-	require.NoError(t, tql.SetActiveDriver("postgres"))
+	require.NoError(t, tql.SetActiveDriver("pgx"))
 
 	id := uuid.NewString()
 	nullable := uuid.NewString()
 
-	_, err := cockroachPqDB.Exec(
+	_, err := cockroachPgxDB.Exec(
 		fmt.Sprintf(
 			"INSERT INTO test VALUES ('%s', '%s'), ('%s', '%s');",
 			id,
@@ -271,7 +271,7 @@ func Test_CockroachDB_pq_QuerySingleOrDefault_Returns_tqlErrMultipleResults_When
 	// Act
 	r, err := tql.QuerySingleOrDefault[result](
 		context.Background(),
-		cockroachPqDB,
+		cockroachPgxDB,
 		d,
 		"SELECT id, nullable FROM test where nullable = $1;",
 		nullable,
@@ -282,18 +282,18 @@ func Test_CockroachDB_pq_QuerySingleOrDefault_Returns_tqlErrMultipleResults_When
 	require.Empty(t, r)
 }
 
-func Test_CockroachDB_pq_QueryOne(t *testing.T) {
+func Test_CockroachDB_pgx_QueryOne(t *testing.T) {
 	// Arrange
-	require.NoError(t, tql.SetActiveDriver("postgres"))
+	require.NoError(t, tql.SetActiveDriver("pgx"))
 
 	id := uuid.New()
 	nullable := uuid.New()
 
-	_, err := cockroachPqDB.Exec(fmt.Sprintf("INSERT INTO test VALUES ('%s', '%s');", id.String(), nullable.String()))
+	_, err := cockroachPgxDB.Exec(fmt.Sprintf("INSERT INTO test VALUES ('%s', '%s');", id.String(), nullable.String()))
 	require.NoError(t, err)
 
 	// Act
-	r, err := tql.QueryFirst[result](context.Background(), cockroachPqDB, "SELECT id, nullable FROM test WHERE id = $1;", id)
+	r, err := tql.QueryFirst[result](context.Background(), cockroachPgxDB, "SELECT id, nullable FROM test WHERE id = $1;", id)
 
 	// Assert
 	require.NoError(t, err)
@@ -302,20 +302,20 @@ func Test_CockroachDB_pq_QueryOne(t *testing.T) {
 	require.Equal(t, nullable.String(), *r.Nullable)
 }
 
-func Test_CockroachDB_pq_QueryOne_With_Named_Parameters(t *testing.T) {
+func Test_CockroachDB_pgx_QueryOne_With_Named_Parameters(t *testing.T) {
 	// Arrange
-	require.NoError(t, tql.SetActiveDriver("postgres"))
+	require.NoError(t, tql.SetActiveDriver("pgx"))
 
 	id := uuid.New()
 	nullable := uuid.New()
 
-	_, err := cockroachPqDB.Exec(fmt.Sprintf("INSERT INTO test (id, nullable) VALUES ('%s', '%s');", id.String(), nullable.String()))
+	_, err := cockroachPgxDB.Exec(fmt.Sprintf("INSERT INTO test (id, nullable) VALUES ('%s', '%s');", id.String(), nullable.String()))
 	require.NoError(t, err)
 
 	// Act
 	r, err := tql.QueryFirst[*string](
 		context.Background(),
-		cockroachPqDB,
+		cockroachPgxDB,
 		"SELECT id FROM test WHERE id = :id;",
 		map[string]any{"id": id},
 	)
@@ -326,36 +326,36 @@ func Test_CockroachDB_pq_QueryOne_With_Named_Parameters(t *testing.T) {
 	require.Equal(t, id.String(), *r)
 }
 
-func Test_CockroachDB_pq_QueryOne_String(t *testing.T) {
+func Test_CockroachDB_pgx_QueryOne_String(t *testing.T) {
 	// Arrange
-	require.NoError(t, tql.SetActiveDriver("postgres"))
+	require.NoError(t, tql.SetActiveDriver("pgx"))
 
 	id := uuid.New()
 	nullable := uuid.New()
 
-	_, err := cockroachPqDB.Exec(fmt.Sprintf("INSERT INTO test (id, nullable) VALUES ('%s', '%s');", id.String(), nullable.String()))
+	_, err := cockroachPgxDB.Exec(fmt.Sprintf("INSERT INTO test (id, nullable) VALUES ('%s', '%s');", id.String(), nullable.String()))
 	require.NoError(t, err)
 
 	// Act
-	r, err := tql.QueryFirst[string](context.Background(), cockroachPqDB, "SELECT id FROM test WHERE id = $1;", id)
+	r, err := tql.QueryFirst[string](context.Background(), cockroachPgxDB, "SELECT id FROM test WHERE id = $1;", id)
 
 	// Assert
 	require.NoError(t, err)
 	require.Equal(t, id.String(), r)
 }
 
-func Test_CockroachDB_pq_QueryOne_String_Pointer(t *testing.T) {
+func Test_CockroachDB_pgx_QueryOne_String_Pointer(t *testing.T) {
 	// Arrange
-	require.NoError(t, tql.SetActiveDriver("postgres"))
+	require.NoError(t, tql.SetActiveDriver("pgx"))
 
 	id := uuid.New()
 	nullable := uuid.New()
 
-	_, err := cockroachPqDB.Exec(fmt.Sprintf("INSERT INTO test (id, nullable) VALUES ('%s', '%s');", id.String(), nullable.String()))
+	_, err := cockroachPgxDB.Exec(fmt.Sprintf("INSERT INTO test (id, nullable) VALUES ('%s', '%s');", id.String(), nullable.String()))
 	require.NoError(t, err)
 
 	// Act
-	r, err := tql.QueryFirst[*string](context.Background(), cockroachPqDB, "SELECT id FROM test WHERE id = $1;", id)
+	r, err := tql.QueryFirst[*string](context.Background(), cockroachPgxDB, "SELECT id FROM test WHERE id = $1;", id)
 
 	// Assert
 	require.NoError(t, err)
@@ -363,20 +363,20 @@ func Test_CockroachDB_pq_QueryOne_String_Pointer(t *testing.T) {
 	require.Equal(t, id.String(), *r)
 }
 
-func Test_CockroachDB_pq_QueryOne_With_Mixed_Named_Positional_Parameters_Returns_Error(t *testing.T) {
+func Test_CockroachDB_pgx_QueryOne_With_Mixed_Named_Positional_Parameters_Returns_Error(t *testing.T) {
 	// Arrange
-	require.NoError(t, tql.SetActiveDriver("postgres"))
+	require.NoError(t, tql.SetActiveDriver("pgx"))
 
 	id := uuid.New()
 	nullable := uuid.New()
 
-	_, err := cockroachPqDB.Exec(fmt.Sprintf("INSERT INTO test (id, nullable) VALUES ('%s', '%s');", id.String(), nullable.String()))
+	_, err := cockroachPgxDB.Exec(fmt.Sprintf("INSERT INTO test (id, nullable) VALUES ('%s', '%s');", id.String(), nullable.String()))
 	require.NoError(t, err)
 
 	// Act
 	r, err := tql.QueryFirst[*string](
 		context.Background(),
-		cockroachPqDB,
+		cockroachPgxDB,
 		"SELECT id FROM test WHERE id = :id;",
 		map[string]any{"id": id},
 	)
@@ -387,18 +387,18 @@ func Test_CockroachDB_pq_QueryOne_With_Mixed_Named_Positional_Parameters_Returns
 	require.Equal(t, id.String(), *r)
 }
 
-func Test_CockroachDB_pq_QueryOne_Int_Pointer(t *testing.T) {
+func Test_CockroachDB_pgx_QueryOne_Int_Pointer(t *testing.T) {
 	// Arrange
-	require.NoError(t, tql.SetActiveDriver("postgres"))
+	require.NoError(t, tql.SetActiveDriver("pgx"))
 
 	id := uuid.New()
 	nullable := uuid.New()
 
-	_, err := cockroachPqDB.Exec(fmt.Sprintf("INSERT INTO test (id, nullable) VALUES ('%s', '%s');", id.String(), nullable.String()))
+	_, err := cockroachPgxDB.Exec(fmt.Sprintf("INSERT INTO test (id, nullable) VALUES ('%s', '%s');", id.String(), nullable.String()))
 	require.NoError(t, err)
 
 	// Act
-	r, err := tql.QueryFirst[*int](context.Background(), cockroachPqDB, "SELECT 420;")
+	r, err := tql.QueryFirst[*int](context.Background(), cockroachPgxDB, "SELECT 420;")
 
 	// Assert
 	require.NoError(t, err)
@@ -406,11 +406,11 @@ func Test_CockroachDB_pq_QueryOne_Int_Pointer(t *testing.T) {
 	require.Equal(t, 420, *r)
 }
 
-func Test_CockroachDB_pq_Query(t *testing.T) {
+func Test_CockroachDB_pgx_Query(t *testing.T) {
 	// Arrange
-	require.NoError(t, tql.SetActiveDriver("postgres"))
+	require.NoError(t, tql.SetActiveDriver("pgx"))
 
-	_, err := cockroachPqDB.Exec("DELETE FROM test;")
+	_, err := cockroachPgxDB.Exec("DELETE FROM test;")
 	require.NoError(t, err)
 
 	const insertStmt = `
@@ -428,11 +428,11 @@ func Test_CockroachDB_pq_Query(t *testing.T) {
 		ids[i] = uuid.NewString()
 	}
 
-	_, err = cockroachPqDB.Exec(insertStmt, ids...)
+	_, err = cockroachPgxDB.Exec(insertStmt, ids...)
 	require.NoError(t, err)
 
 	// Act
-	r, err := tql.Query[result](context.Background(), cockroachPqDB, "SELECT id, nullable FROM test;")
+	r, err := tql.Query[result](context.Background(), cockroachPgxDB, "SELECT id, nullable FROM test;")
 
 	// Assert
 	require.NoError(t, err)
@@ -444,11 +444,11 @@ func Test_CockroachDB_pq_Query(t *testing.T) {
 	}
 }
 
-func Test_CockroachDB_pq_Query_Basic_Type_From_Tx(t *testing.T) {
+func Test_CockroachDB_pgx_Query_Basic_Type_From_Tx(t *testing.T) {
 	// Arrange
-	require.NoError(t, tql.SetActiveDriver("postgres"))
+	require.NoError(t, tql.SetActiveDriver("pgx"))
 
-	_, err := cockroachPqDB.Exec("DELETE FROM test;")
+	_, err := cockroachPgxDB.Exec("DELETE FROM test;")
 	require.NoError(t, err)
 
 	const insertStmt = `
@@ -460,10 +460,10 @@ func Test_CockroachDB_pq_Query_Basic_Type_From_Tx(t *testing.T) {
 	id := uuid.NewString()
 	nullable := uuid.NewString()
 
-	_, err = cockroachPqDB.Exec(insertStmt, id, nullable)
+	_, err = cockroachPgxDB.Exec(insertStmt, id, nullable)
 	require.NoError(t, err)
 
-	tx, _ := cockroachPqDB.BeginTx(context.Background(), &sql.TxOptions{})
+	tx, _ := cockroachPgxDB.BeginTx(context.Background(), &sql.TxOptions{})
 
 	// Act
 	r, err := tql.QueryFirst[string](context.Background(), tx, "SELECT id FROM test;")
@@ -476,11 +476,11 @@ func Test_CockroachDB_pq_Query_Basic_Type_From_Tx(t *testing.T) {
 	require.Equal(t, id, r)
 }
 
-func Test_CockroachDB_pq_Query_Basic_Type_Pointer(t *testing.T) {
+func Test_CockroachDB_pgx_Query_Basic_Type_Pointer(t *testing.T) {
 	// Arrange
-	require.NoError(t, tql.SetActiveDriver("postgres"))
+	require.NoError(t, tql.SetActiveDriver("pgx"))
 
-	_, err := cockroachPqDB.Exec("DELETE FROM test;")
+	_, err := cockroachPgxDB.Exec("DELETE FROM test;")
 	require.NoError(t, err)
 
 	const insertStmt = `
@@ -492,11 +492,11 @@ func Test_CockroachDB_pq_Query_Basic_Type_Pointer(t *testing.T) {
 	id := uuid.NewString()
 	nullable := uuid.NewString()
 
-	_, err = cockroachPqDB.Exec(insertStmt, id, nullable)
+	_, err = cockroachPgxDB.Exec(insertStmt, id, nullable)
 	require.NoError(t, err)
 
 	// Act
-	r, err := tql.QueryFirst[*string](context.Background(), cockroachPqDB, "SELECT id FROM test;")
+	r, err := tql.QueryFirst[*string](context.Background(), cockroachPgxDB, "SELECT id FROM test;")
 
 	// Assert
 	require.NoError(t, err)
@@ -504,47 +504,47 @@ func Test_CockroachDB_pq_Query_Basic_Type_Pointer(t *testing.T) {
 	require.Equal(t, id, *r)
 }
 
-func Test_CockroachDB_pq_Query_Basic_Type_Pointer_Null(t *testing.T) {
+func Test_CockroachDB_pgx_Query_Basic_Type_Pointer_Null(t *testing.T) {
 	// Arrange
-	require.NoError(t, tql.SetActiveDriver("postgres"))
+	require.NoError(t, tql.SetActiveDriver("pgx"))
 
 	// Act
-	r, err := tql.QueryFirst[*string](context.Background(), cockroachPqDB, "SELECT NULL;")
+	r, err := tql.QueryFirst[*string](context.Background(), cockroachPgxDB, "SELECT NULL;")
 
 	// Assert
 	require.NoError(t, err)
 	require.Nil(t, r)
 }
 
-func Test_CockroachDB_pq_Query_Empty_Result(t *testing.T) {
+func Test_CockroachDB_pgx_Query_Empty_Result(t *testing.T) {
 	// Arrange
-	require.NoError(t, tql.SetActiveDriver("postgres"))
+	require.NoError(t, tql.SetActiveDriver("pgx"))
 
-	_, err := cockroachPqDB.Exec("INSERT INTO test VALUES ('asdf', 'fdsa');")
+	_, err := cockroachPgxDB.Exec("INSERT INTO test VALUES ('asdf', 'fdsa');")
 	require.NoError(t, err)
 
 	// Act
-	r, err := tql.Query[result](context.Background(), cockroachPqDB, "SELECT * FROM test WHERE id = '';")
+	r, err := tql.Query[result](context.Background(), cockroachPgxDB, "SELECT * FROM test WHERE id = '';")
 
 	// Assert
 	require.NoError(t, err)
 	require.NotNil(t, r)
 }
 
-func Test_CockroachDB_pq_Exec(t *testing.T) {
+func Test_CockroachDB_pgx_Exec(t *testing.T) {
 	// Arrange
-	require.NoError(t, tql.SetActiveDriver("postgres"))
+	require.NoError(t, tql.SetActiveDriver("pgx"))
 
 	// Act
 	const insertStmt = "INSERT INTO test (id, nullable) VALUES (:test, :test2);"
-	_, err := tql.Exec(context.Background(), cockroachPqDB, insertStmt, map[string]any{
+	_, err := tql.Exec(context.Background(), cockroachPgxDB, insertStmt, map[string]any{
 		"test":  "totally_new_id",
 		"test2": "totally_new_id_2",
 	})
 
 	// Assert
 	require.NoError(t, err)
-	r, err := tql.QueryFirst[result](context.Background(), cockroachPqDB, "SELECT * FROM test WHERE id = $1;", "totally_new_id")
+	r, err := tql.QueryFirst[result](context.Background(), cockroachPgxDB, "SELECT * FROM test WHERE id = $1;", "totally_new_id")
 
 	require.NotEmpty(t, r)
 	require.Equal(t, "totally_new_id", r.ID)
@@ -553,9 +553,9 @@ func Test_CockroachDB_pq_Exec(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func Test_CockroachDB_pq_Exec_With_Struct(t *testing.T) {
+func Test_CockroachDB_pgx_Exec_With_Struct(t *testing.T) {
 	// Arrange
-	require.NoError(t, tql.SetActiveDriver("postgres"))
+	require.NoError(t, tql.SetActiveDriver("pgx"))
 
 	// Act
 	id := uuid.NewString()
@@ -568,11 +568,11 @@ func Test_CockroachDB_pq_Exec_With_Struct(t *testing.T) {
 		UserID: userID,
 	}
 	const insertStmt = "INSERT INTO test (id, nullable) VALUES (:test, :test2);"
-	_, err := tql.Exec(context.Background(), cockroachPqDB, insertStmt, params)
+	_, err := tql.Exec(context.Background(), cockroachPgxDB, insertStmt, params)
 
 	// Assert
 	require.NoError(t, err)
-	r, err := tql.QueryFirst[result](context.Background(), cockroachPqDB, "SELECT * FROM test WHERE id = $1;", id)
+	r, err := tql.QueryFirst[result](context.Background(), cockroachPgxDB, "SELECT * FROM test WHERE id = $1;", id)
 
 	require.NotEmpty(t, r)
 	require.Equal(t, id, r.ID)
@@ -581,20 +581,20 @@ func Test_CockroachDB_pq_Exec_With_Struct(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func Test_CockroachDB_pq_Exec_Not_Named(t *testing.T) {
+func Test_CockroachDB_pgx_Exec_Not_Named(t *testing.T) {
 	// Arrange
-	require.NoError(t, tql.SetActiveDriver("postgres"))
+	require.NoError(t, tql.SetActiveDriver("pgx"))
 
 	id := uuid.NewString()
 	userID := uuid.NewString()
 	const insertStmt = "INSERT INTO test (id, nullable) VALUES ($1, $2);"
 
 	// Act
-	_, err := tql.Exec(context.Background(), cockroachPqDB, insertStmt, id, userID)
+	_, err := tql.Exec(context.Background(), cockroachPgxDB, insertStmt, id, userID)
 
 	// Assert
 	require.NoError(t, err)
-	r, err := tql.QueryFirst[result](context.Background(), cockroachPqDB, "SELECT * FROM test WHERE id = $1;", id)
+	r, err := tql.QueryFirst[result](context.Background(), cockroachPgxDB, "SELECT * FROM test WHERE id = $1;", id)
 
 	require.NotEmpty(t, r)
 	require.Equal(t, id, r.ID)
@@ -603,23 +603,23 @@ func Test_CockroachDB_pq_Exec_Not_Named(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func Test_CockroachDB_pq_Exec_Mixed_Named_Positional(t *testing.T) {
+func Test_CockroachDB_pgx_Exec_Mixed_Named_Positional(t *testing.T) {
 	// Arrange
-	require.NoError(t, tql.SetActiveDriver("postgres"))
+	require.NoError(t, tql.SetActiveDriver("pgx"))
 
 	id := uuid.NewString()
 	userID := uuid.NewString()
 
 	// Act
 	const insertStmt = "INSERT INTO test (id, nullable) VALUES ($1, :test2);"
-	_, err := tql.Exec(context.Background(), cockroachPqDB, insertStmt, id, userID, map[string]any{"test2": "asdf"})
+	_, err := tql.Exec(context.Background(), cockroachPgxDB, insertStmt, id, userID, map[string]any{"test2": "asdf"})
 
 	// Assert
 	require.Error(t, err)
 	require.Equal(t, "mixed positional and named parameters", err.Error())
 	//require.ErrorIs(t, err, fmt.Errorf("mixed positional and named parameters"))
 
-	r, err := tql.QueryFirst[result](context.Background(), cockroachPqDB, "SELECT * FROM test WHERE id = $1;", id)
+	r, err := tql.QueryFirst[result](context.Background(), cockroachPgxDB, "SELECT * FROM test WHERE id = $1;", id)
 	require.ErrorIs(t, err, sql.ErrNoRows)
 	require.Empty(t, r)
 }

@@ -13,8 +13,10 @@ import (
 	_ "github.com/lib/pq"
 )
 
-var pgDB *sql.DB
-var cockroachDB *sql.DB
+var pqDB *sql.DB
+var pgxDB *sql.DB
+var cockroachPqDB *sql.DB
+var cockroachPgxDB *sql.DB
 var mariaDB *sql.DB
 var sqlite3DB *sql.DB
 
@@ -70,12 +72,22 @@ func TestMain(m *testing.M) {
 		}
 	}()
 
-	pgDB, err = sql.Open("postgres", dbConnStringPG)
+	pqDB, err = sql.Open("postgres", dbConnStringPG)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	cockroachDB, err = sql.Open("postgres", dbConnStringCockroachDB)
+	pgxDB, err = sql.Open("pgx", dbConnStringPG)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	cockroachPqDB, err = sql.Open("postgres", dbConnStringCockroachDB)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	cockroachPgxDB, err = sql.Open("pgx", dbConnStringCockroachDB)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -91,11 +103,19 @@ func TestMain(m *testing.M) {
 	}
 
 	defer func() {
-		if err := pgDB.Close(); err != nil {
+		if err := pqDB.Close(); err != nil {
 			log.Printf("error closing database: %s", err.Error())
 		}
 
-		if err := cockroachDB.Close(); err != nil {
+		if err := pgxDB.Close(); err != nil {
+			log.Printf("error closing database: %s", err.Error())
+		}
+
+		if err := cockroachPqDB.Close(); err != nil {
+			log.Printf("error closing database: %s", err.Error())
+		}
+
+		if err := cockroachPgxDB.Close(); err != nil {
 			log.Printf("error closing database: %s", err.Error())
 		}
 
@@ -108,11 +128,19 @@ func TestMain(m *testing.M) {
 		}
 	}()
 
-	if _, err := pgDB.Exec("CREATE TABLE test (id text, nullable text);"); err != nil {
+	if _, err := pqDB.Exec("CREATE TABLE IF NOT EXISTS test (id text, nullable text);"); err != nil {
 		log.Fatal(err)
 	}
 
-	if _, err := cockroachDB.Exec("CREATE TABLE test (id text, nullable text);"); err != nil {
+	if _, err := pgxDB.Exec("CREATE TABLE IF NOT EXISTS test (id text, nullable text);"); err != nil {
+		log.Fatal(err)
+	}
+
+	if _, err := cockroachPqDB.Exec("CREATE TABLE IF NOT EXISTS test (id text, nullable text);"); err != nil {
+		log.Fatal(err)
+	}
+
+	if _, err := cockroachPgxDB.Exec("CREATE TABLE IF NOT EXISTS test (id text, nullable text);"); err != nil {
 		log.Fatal(err)
 	}
 
@@ -130,11 +158,19 @@ func TestMain(m *testing.M) {
 		log.Println(err)
 	}
 
-	if _, err := pgDB.Exec("DROP TABLE test;"); err != nil {
+	if _, err := pqDB.Exec("DROP TABLE IF EXISTS test;"); err != nil {
 		log.Println(err)
 	}
 
-	if _, err := cockroachDB.Exec("DROP TABLE test;"); err != nil {
+	if _, err := pgxDB.Exec("DROP TABLE IF EXISTS test;"); err != nil {
+		log.Println(err)
+	}
+
+	if _, err := cockroachPqDB.Exec("DROP TABLE IF EXISTS test;"); err != nil {
+		log.Println(err)
+	}
+
+	if _, err := cockroachPgxDB.Exec("DROP TABLE IF EXISTS test;"); err != nil {
 		log.Println(err)
 	}
 
