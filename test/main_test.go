@@ -31,6 +31,10 @@ type result struct {
 	Nullable *string `db:"nullable"`
 }
 
+type setupOperations struct {
+	dbs []*sql.DB
+}
+
 func TestMain(m *testing.M) {
 	if err := godotenv.Load("config.env"); err != nil {
 		log.Fatal(err)
@@ -62,7 +66,10 @@ func TestMain(m *testing.M) {
 	}
 
 	if err := fixture.Start(); err != nil {
-		fixture.Stop()
+		if err := fixture.Stop(); err != nil {
+			log.Println(err)
+		}
+
 		log.Fatal(err)
 	}
 
@@ -72,85 +79,81 @@ func TestMain(m *testing.M) {
 		}
 	}()
 
+	dbs := make([]*sql.DB, 0)
+
 	pqDB, err = sql.Open("postgres", dbConnStringPG)
 	if err != nil {
 		log.Fatal(err)
 	}
+	dbs = append(dbs, pqDB)
 
 	pgxDB, err = sql.Open("pgx", dbConnStringPG)
 	if err != nil {
 		log.Fatal(err)
 	}
+	dbs = append(dbs, pgxDB)
 
 	cockroachPqDB, err = sql.Open("postgres", dbConnStringCockroachDB)
 	if err != nil {
 		log.Fatal(err)
 	}
+	dbs = append(dbs, cockroachPqDB)
 
 	cockroachPgxDB, err = sql.Open("pgx", dbConnStringCockroachDB)
 	if err != nil {
 		log.Fatal(err)
 	}
+	dbs = append(dbs, cockroachPgxDB)
 
 	mariaDB, err = sql.Open("mysql", dbConnStringMariaDB)
 	if err != nil {
 		log.Fatal(err)
 	}
+	dbs = append(dbs, mariaDB)
 
 	sqlite3DB, err = sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		log.Fatal(err)
 	}
+	dbs = append(dbs, sqlite3DB)
 
 	defer func() {
-		if err := pqDB.Close(); err != nil {
-			log.Printf("error closing database: %s", err.Error())
-		}
-
-		if err := pgxDB.Close(); err != nil {
-			log.Printf("error closing database: %s", err.Error())
-		}
-
-		if err := cockroachPqDB.Close(); err != nil {
-			log.Printf("error closing database: %s", err.Error())
-		}
-
-		if err := cockroachPgxDB.Close(); err != nil {
-			log.Printf("error closing database: %s", err.Error())
-		}
-
-		if err := mariaDB.Close(); err != nil {
-			log.Printf("error closing database: %s", err.Error())
-		}
-
-		if err := sqlite3DB.Close(); err != nil {
-			log.Printf("error closing database: %s", err.Error())
+		for _, db := range dbs {
+			if err := db.Close(); err != nil {
+				log.Printf("error closing database: %s", err.Error())
+			}
 		}
 	}()
 
-	if _, err := pqDB.Exec("CREATE TABLE IF NOT EXISTS test (id text, nullable text);"); err != nil {
-		log.Fatal(err)
+	for _, db := range dbs {
+		if _, err := db.Exec("CREATE TABLE IF NOT EXISTS test (id text, nullable text);"); err != nil {
+			log.Fatal(err)
+		}
 	}
 
-	if _, err := pgxDB.Exec("CREATE TABLE IF NOT EXISTS test (id text, nullable text);"); err != nil {
-		log.Fatal(err)
-	}
-
-	if _, err := cockroachPqDB.Exec("CREATE TABLE IF NOT EXISTS test (id text, nullable text);"); err != nil {
-		log.Fatal(err)
-	}
-
-	if _, err := cockroachPgxDB.Exec("CREATE TABLE IF NOT EXISTS test (id text, nullable text);"); err != nil {
-		log.Fatal(err)
-	}
-
-	if _, err := mariaDB.Exec("CREATE TABLE test (id text, nullable text);"); err != nil {
-		log.Fatal(err)
-	}
-
-	if _, err := sqlite3DB.Exec("CREATE TABLE test (id text, nullable text);"); err != nil {
-		log.Fatal(err)
-	}
+	//if _, err := pqDB.Exec("CREATE TABLE IF NOT EXISTS test (id text, nullable text);"); err != nil {
+	//	log.Fatal(err)
+	//}
+	//
+	//if _, err := pgxDB.Exec("CREATE TABLE IF NOT EXISTS test (id text, nullable text);"); err != nil {
+	//	log.Fatal(err)
+	//}
+	//
+	//if _, err := cockroachPqDB.Exec("CREATE TABLE IF NOT EXISTS test (id text, nullable text);"); err != nil {
+	//	log.Fatal(err)
+	//}
+	//
+	//if _, err := cockroachPgxDB.Exec("CREATE TABLE IF NOT EXISTS test (id text, nullable text);"); err != nil {
+	//	log.Fatal(err)
+	//}
+	//
+	//if _, err := mariaDB.Exec("CREATE TABLE IF NOT EXISTS test (id text, nullable text);"); err != nil {
+	//	log.Fatal(err)
+	//}
+	//
+	//if _, err := sqlite3DB.Exec("CREATE TABLE IF NOT EXISTS test (id text, nullable text);"); err != nil {
+	//	log.Fatal(err)
+	//}
 
 	_ = m.Run()
 
@@ -158,29 +161,35 @@ func TestMain(m *testing.M) {
 		log.Println(err)
 	}
 
-	if _, err := pqDB.Exec("DROP TABLE IF EXISTS test;"); err != nil {
-		log.Println(err)
+	for _, db := range dbs {
+		if _, err := db.Exec("DROP TABLE IF EXISTS test;"); err != nil {
+			log.Println(err)
+		}
 	}
 
-	if _, err := pgxDB.Exec("DROP TABLE IF EXISTS test;"); err != nil {
-		log.Println(err)
-	}
-
-	if _, err := cockroachPqDB.Exec("DROP TABLE IF EXISTS test;"); err != nil {
-		log.Println(err)
-	}
-
-	if _, err := cockroachPgxDB.Exec("DROP TABLE IF EXISTS test;"); err != nil {
-		log.Println(err)
-	}
-
-	if _, err := mariaDB.Exec("DROP TABLE test;"); err != nil {
-		log.Println(err)
-	}
-
-	if _, err := sqlite3DB.Exec("DROP TABLE test;"); err != nil {
-		log.Println(err)
-	}
+	//if _, err := pqDB.Exec("DROP TABLE IF EXISTS test;"); err != nil {
+	//	log.Println(err)
+	//}
+	//
+	//if _, err := pgxDB.Exec("DROP TABLE IF EXISTS test;"); err != nil {
+	//	log.Println(err)
+	//}
+	//
+	//if _, err := cockroachPqDB.Exec("DROP TABLE IF EXISTS test;"); err != nil {
+	//	log.Println(err)
+	//}
+	//
+	//if _, err := cockroachPgxDB.Exec("DROP TABLE IF EXISTS test;"); err != nil {
+	//	log.Println(err)
+	//}
+	//
+	//if _, err := mariaDB.Exec("DROP TABLE test;"); err != nil {
+	//	log.Println(err)
+	//}
+	//
+	//if _, err := sqlite3DB.Exec("DROP TABLE test;"); err != nil {
+	//	log.Println(err)
+	//}
 
 	if err := fixture.Stop(); err != nil {
 		log.Fatal(err)
