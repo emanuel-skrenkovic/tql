@@ -1,16 +1,9 @@
 # tql
 
-A horrible name (blame AI) for a library that uses generics to execute database queries. 
+Simple convenience functions (with generics) around `database/sql`.
+Designed to be used with existing `sql.DB`, `sql.Tx` types.
 
 Marshals rows into structs using the `db` tag. For the struct field to be marshalled, it needs to contain the `db` tag.
-
-### Example struct:
-```go
-type Foo struct {
-    ID string `db:"id"` // will be marshalled
-    Value int           // won't be marshalled
-}
-```
 
 ### Example usage:
 ```go
@@ -30,23 +23,18 @@ if err != nil {
 ```
 
 ### Supports named parameters:
-```sql
-INSERT INTO foo (id) VALUES (:id);
-```
-
-### Example usage:
 ```go
 type Foo struct {
     ID    string `db:"id"`
     Value string `db:"value"`
 }
 
-const stmt = "INSERT INTO foo (id, value) VALUES (:id, :value);"
-
 foo := Foo {
     ID:    "foo",
     Value: "bar",
 }
+
+const stmt = "INSERT INTO foo (id, value) VALUES (:id, :value);"
 
 result, err := tql.Exec(context.Background(), db, stmt, foo)
 if err != nil { 
@@ -58,34 +46,18 @@ if err != nil {
 
 ## API
 ```go
-QuerySingle[T any](ctx context.Context, q Querier, query string, params ...any) (result T, err error)
-```
-QuerySingle queries the database and returns the first result returned. If the query does not return any rows, returns an error. If the query produces more than one result, returns an error.
+QuerySingle[T any](ctx context.Context, q Querier, query string, params ...any) (T, error)
 
-```go
-QuerySingleOrDefault[T any](ctx context.Context, q Querier, def T, query string, params ...any) (result T, err error)
-```
-QuerySingleOrDefault queries the database and returns the first result returned. If the query does not return any rows, returns the provided default value. If the query produces more than 1 row, returns an error.
+QuerySingleOrDefault[T any](ctx context.Context, q Querier, def T, query string, params ...any) (T, error)
 
-```go
-QueryFirst[T any](ctx context.Context, q Querier, query string, params ...any) (result T, err error)
-```
-QueryFirst queries the database and returns the first result.
+QueryFirst[T any](ctx context.Context, q Querier, query string, params ...any) (T, error)
 
-```go
-QueryFirstOrDefault[T any](ctx context.Context, q Querier, def T, query string, params ...any) (result T, err error)
-```
-QueryFirst queries the database and returns the first result. If there are no rows returned, returns the provided default value.
+QueryFirstOrDefault[T any](ctx context.Context, q Querier, def T, query string, params ...any) (T, error)
 
-```go
-Query[T any](ctx context.Context, q Querier, query string, params ...any) (result []T, err error)
-```
-Query queries the database and returns all the returned rows.
+Query[T any](ctx context.Context, q Querier, query string, params ...any) ([]T, error)
 
-```go
 Exec(ctx context.Context, e Executor, query string, params ...any) (sql.Result, error) 
 ```
-Exec executes a statement and returns an sql.Result or an error.
 
 ## Interfaces used
 ```go
