@@ -310,7 +310,8 @@ ParamLoop:
 			value := reflect.Indirect(val)
 
 			valueType := reflect.TypeOf(p)
-			typeName := valueType.Name()
+			typeName := typeName(valueType)
+
 			fieldsCount := valueType.NumField()
 
 			fieldTags, found := typeFieldDbTags[typeName]
@@ -347,10 +348,6 @@ ParamLoop:
 	}
 
 	return parameters, nil
-}
-
-func isNameChar(c rune) bool {
-	return unicode.IsLetter(c) || unicode.IsNumber(c) || c == '_'
 }
 
 var activeDriver string
@@ -452,7 +449,7 @@ func parameteriseQuery(
 			continue
 		}
 
-		if insideName && !isNameChar(c) {
+		if insideName && !(unicode.IsLetter(c) || unicode.IsNumber(c) || c == '_') {
 			arg, found := parameters[currentName.String()]
 			if !found {
 				return "", []any{}, fmt.Errorf("query parameter '%s' not found in provided parameters", currentName.String())
@@ -496,7 +493,8 @@ func createDestinations(source any, columns []string) ([]any, error) {
 	value := reflect.ValueOf(source).Elem()
 	valueType := value.Type()
 
-	typeName := valueType.Name()
+	typeName := typeName(valueType)
+
 	if indices, found := mapper.typeFieldCache[typeName]; found {
 		dest := make([]any, len(columns))
 		for i, c := range columns {
@@ -579,7 +577,7 @@ func bindArgs(params ...any) (map[string]any, error) {
 			valueType := reflect.TypeOf(p)
 
 			// Aggressively pre-cache the struct 'db' tag bindings.
-			typeName := valueType.Name()
+			typeName := typeName(valueType)
 			fieldsCount := valueType.NumField()
 
 			fieldTags, found := typeFieldDbTags[typeName]
@@ -605,4 +603,8 @@ func bindArgs(params ...any) (map[string]any, error) {
 	}
 
 	return parameters, nil
+}
+
+func typeName(typ reflect.Type) string {
+	return strings.Join([]string{typ.PkgPath(), typ.Name()}, "/")
 }
