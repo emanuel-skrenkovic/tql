@@ -16,10 +16,12 @@ var ErrMultipleResults = errors.New("sql: found multiple results expected single
 
 type typeMapper struct {
 	typeFieldCache map[string]map[string]int
+	typeFuncs      map[string][]func(reflect.Value) any
 }
 
 var mapper = typeMapper{
 	typeFieldCache: make(map[string]map[string]int),
+	typeFuncs:      make(map[string][]func(reflect.Value) any),
 }
 
 // SetActiveDriver
@@ -487,17 +489,22 @@ func parameteriseQuery(
 	return result.String(), resultArgs, nil
 }
 
+func addressable(field reflect.Value) any { return field.Addr().Interface() }
+
+func nonAddressable(field reflect.Value) any { return field.Interface() }
+
 // TODO: candidate for caching
 func createDestinations(source any, columns []string) ([]any, error) {
 	value := reflect.ValueOf(source).Elem()
 	valueType := value.Type()
 	typeName := typeName(valueType)
 
-	numFields := valueType.NumField()
-
 	indices, found := mapper.typeFieldCache[typeName]
 	if !found {
+		numFields := valueType.NumField()
+
 		indices = make(map[string]int, numFields)
+		typeFuncs := make([]func(reflect.Value) any, numFields)
 
 		for i := 0; i < numFields; i++ {
 			field := valueType.Field(i)
@@ -508,10 +515,19 @@ func createDestinations(source any, columns []string) ([]any, error) {
 			}
 
 			indices[tag] = i
+
+			if value.Field(i).CanAddr() {
+				typeFuncs[i] = addressable
+			} else {
+				typeFuncs[i] = nonAddressable
+			}
 		}
 
+		mapper.typeFuncs[typeName] = typeFuncs
 		mapper.typeFieldCache[typeName] = indices
 	}
+
+	typeFuncs := mapper.typeFuncs[typeName]
 
 	dest := make([]any, len(columns))
 	for i, c := range columns {
@@ -520,12 +536,7 @@ func createDestinations(source any, columns []string) ([]any, error) {
 			return nil, fmt.Errorf("no matching field found for column: %s", c)
 		}
 
-		field := value.Field(fieldIdx)
-		if field.CanAddr() {
-			dest[i] = field.Addr().Interface()
-		} else {
-			dest[i] = field.Interface()
-		}
+		dest[i] = typeFuncs[i](value.Field(fieldIdx))
 	}
 
 	return dest, nil
@@ -559,7 +570,6 @@ func bindArgs(params ...any) (map[string]any, error) {
 			}
 
 		case reflect.Struct:
-			value := reflect.Indirect(val)
 			valueType := reflect.TypeOf(p)
 
 			// Aggressively pre-cache the struct 'db' tag bindings.
@@ -569,7 +579,6 @@ func bindArgs(params ...any) (map[string]any, error) {
 			fieldTags, found := typeFieldDbTags[typeName]
 			if !found {
 				fieldTags = make([]string, fieldsCount)
-				typeFieldDbTags[typeName] = fieldTags
 
 				for i := 0; i < fieldsCount; i++ {
 					field := valueType.Field(i)
@@ -580,8 +589,11 @@ func bindArgs(params ...any) (map[string]any, error) {
 
 					fieldTags[i] = tag
 				}
+
+				typeFieldDbTags[typeName] = fieldTags
 			}
 
+			value := reflect.Indirect(val)
 			for i := 0; i < fieldsCount; i++ {
 				parameters[fieldTags[i]] = value.Field(i).Interface()
 			}
