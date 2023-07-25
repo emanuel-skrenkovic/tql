@@ -17,10 +17,10 @@ func Benchmark_Postgres_ParameteriseQuery(b *testing.B) {
 	}
 	am := t{"Emanuel Skrenkovic", 30, "Emanuel", "Skrenkovic"}
 
+	args, _ := bindArgs(am)
 	const query = "INSERT INTO foo (a, b, c, d) VALUES (:name, :age, :first, :last)"
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		args, _ := bindArgs(am)
 		_, _, _ = parameteriseQuery(n, p, query, args)
 	}
 }

@@ -307,18 +307,15 @@ ParamLoop:
 			}
 
 		case reflect.Struct:
-			value := reflect.Indirect(val)
-
 			valueType := reflect.TypeOf(p)
 			typeName := typeName(valueType)
 
-			fieldsCount := valueType.NumField()
-
 			fieldTags, found := typeFieldDbTags[typeName]
 			if !found {
+				fieldsCount := valueType.NumField()
+
 				fieldTags = make([]string, fieldsCount)
 				exportedFieldIndices := make([]int, 0, fieldsCount)
-				typeFieldDbTags[typeName] = fieldTags
 
 				for i := 0; i < fieldsCount; i++ {
 					field := valueType.Field(i)
@@ -339,6 +336,7 @@ ParamLoop:
 				typeExportedFieldIndices[typeName] = exportedFieldIndices
 			}
 
+			value := reflect.Indirect(val)
 			for _, i := range typeExportedFieldIndices[typeName] {
 				field := value.Field(i)
 				parameters[fieldTags[i]] = field.Interface()
@@ -493,10 +491,9 @@ func createDestinations(source any, columns []string) ([]any, error) {
 	valueType := value.Type()
 	typeName := typeName(valueType)
 
-	numFields := valueType.NumField()
-
 	indices, found := mapper.typeFieldCache[typeName]
 	if !found {
+		numFields := valueType.NumField()
 		indices = make(map[string]int, numFields)
 
 		for i := 0; i < numFields; i++ {
@@ -521,9 +518,10 @@ func createDestinations(source any, columns []string) ([]any, error) {
 		}
 
 		field := value.Field(fieldIdx)
-		if field.CanAddr() {
+		switch field.CanAddr() {
+		case true:
 			dest[i] = field.Addr().Interface()
-		} else {
+		case false:
 			dest[i] = field.Interface()
 		}
 	}
