@@ -492,38 +492,26 @@ func parameteriseQuery(
 func createDestinations(source any, columns []string) ([]any, error) {
 	value := reflect.ValueOf(source).Elem()
 	valueType := value.Type()
-
 	typeName := typeName(valueType)
 
-	if indices, found := mapper.typeFieldCache[typeName]; found {
-		dest := make([]any, len(columns))
-		for i, c := range columns {
-			fieldIdx, found := indices[c]
-			if !found {
-				return nil, fmt.Errorf("no matching field found for column: %s", c)
-			}
-
-			field := value.Field(fieldIdx)
-			if field.CanAddr() {
-				dest[i] = field.Addr().Interface()
-			} else {
-				dest[i] = field.Interface()
-			}
-		}
-		return dest, nil
-	}
-
 	numFields := valueType.NumField()
-	indices := make(map[string]int, numFields)
-	for i := 0; i < numFields; i++ {
-		field := valueType.Field(i)
 
-		tag, found := field.Tag.Lookup("db")
-		if !found {
-			continue
+	indices, found := mapper.typeFieldCache[typeName]
+	if !found {
+		indices = make(map[string]int, numFields)
+
+		for i := 0; i < numFields; i++ {
+			field := valueType.Field(i)
+
+			tag, found := field.Tag.Lookup("db")
+			if !found {
+				continue
+			}
+
+			indices[tag] = i
 		}
 
-		indices[tag] = i
+		mapper.typeFieldCache[typeName] = indices
 	}
 
 	dest := make([]any, len(columns))
@@ -540,8 +528,6 @@ func createDestinations(source any, columns []string) ([]any, error) {
 			dest[i] = field.Interface()
 		}
 	}
-
-	mapper.typeFieldCache[typeName] = indices
 
 	return dest, nil
 }
