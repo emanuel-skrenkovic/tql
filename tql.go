@@ -317,6 +317,7 @@ ParamLoop:
 			fieldTags, found := typeFieldDbTags[typeName]
 			if !found {
 				fieldTags = make([]string, fieldsCount)
+				exportedFieldIndices := make([]int, 0, fieldsCount)
 				typeFieldDbTags[typeName] = fieldTags
 
 				for i := 0; i < fieldsCount; i++ {
@@ -332,16 +333,14 @@ ParamLoop:
 					}
 
 					fieldTags[i] = tag
+					exportedFieldIndices = append(exportedFieldIndices, i)
 				}
+
+				typeExportedFieldIndices[typeName] = exportedFieldIndices
 			}
 
-			for i := 0; i < fieldsCount; i++ {
-				// TODO: too inefficient!
+			for _, i := range typeExportedFieldIndices[typeName] {
 				field := value.Field(i)
-				sf := valueType.Field(i)
-				if !sf.IsExported() {
-					continue
-				}
 				parameters[fieldTags[i]] = field.Interface()
 			}
 		}
@@ -539,6 +538,7 @@ func createDestinations(source any, columns []string) ([]any, error) {
 //
 // tagName := typeFieldDbTags[typeName][fieldNumber]
 var typeFieldDbTags = make(map[string][]string)
+var typeExportedFieldIndices = make(map[string][]int)
 
 func bindArgs(params ...any) (map[string]any, error) {
 	parameters := make(map[string]any)
