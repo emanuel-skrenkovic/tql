@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/eskrenkovic/tql"
+	"github.com/emanuel-skrenkovic/tql"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 

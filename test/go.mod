@@ -1,10 +1,10 @@
-module github.com/eskrenkovic/tql/test
+module github.com/emanuel-skrenkovic/tql/test
 
 go 1.20
 
 require (
 	github.com/docker/go-connections v0.4.0
-	github.com/eskrenkovic/tql v0.0.2
+	github.com/emanuel-skrenkovic/tql v0.0.2
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/google/uuid v1.3.0
 	github.com/jackc/pgx/v5 v5.4.2
@@ -54,6 +54,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/eskrenkovic/tql => ../
+replace github.com/emanuel-skrenkovic/tql => ../
 
 //replace github.com/go-sql-driver/mysql => ../../mysql

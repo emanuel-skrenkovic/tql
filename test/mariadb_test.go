@@ -4,10 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/eskrenkovic/tql"
+	"testing"
+
+	"github.com/emanuel-skrenkovic/tql"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func Test_MariaDB_QueryFirstOrDefault_Returns_First_Result(t *testing.T) {
