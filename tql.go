@@ -86,7 +86,6 @@ func QuerySingle[T any](ctx context.Context, q Querier, query string, params ...
 	if resultsLen < 1 {
 		return result, sql.ErrNoRows
 	}
-
 	if resultsLen > 1 {
 		return result, ErrMultipleResults
 	}
@@ -115,8 +114,7 @@ func QueryFirst[T any](ctx context.Context, q Querier, query string, params ...a
 		return result, err
 	}
 
-	var rows *sql.Rows
-	rows, err = q.QueryContext(ctx, parameterisedQuery, args...)
+	rows, err := q.QueryContext(ctx, parameterisedQuery, args...)
 	if err != nil {
 		return result, err
 	}
@@ -195,8 +193,7 @@ func Query[T any](ctx context.Context, q Querier, query string, params ...any) (
 		return result, err
 	}
 
-	var rows *sql.Rows
-	rows, err = q.QueryContext(ctx, parameterisedQuery, args...)
+	rows, err := q.QueryContext(ctx, parameterisedQuery, args...)
 	if err != nil {
 		return result, err
 	}
@@ -539,7 +536,8 @@ var typeFieldDbTags = make(map[string][]string)
 var typeExportedFieldIndices = make(map[string][]int)
 
 func bindArgs(params ...any) (map[string]any, error) {
-	parameters := make(map[string]any)
+	parameters := make(map[string]any, len(params))
+
 	for _, p := range params {
 		val := reflect.ValueOf(p)
 
