@@ -1,3 +1,3 @@
 module github.com/emanuel-skrenkovic/tql
 
-go 1.20
+go 1.22

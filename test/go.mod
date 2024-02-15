@@ -1,6 +1,8 @@
 module github.com/emanuel-skrenkovic/tql/test
 
-go 1.20
+go 1.22
+
+toolchain go1.22.0
 
 require (
 	github.com/docker/go-connections v0.4.0
