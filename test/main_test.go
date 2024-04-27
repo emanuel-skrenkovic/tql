@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"os"
@@ -31,10 +32,6 @@ type result struct {
 	Nullable *string `db:"nullable"`
 }
 
-type setupOperations struct {
-	dbs []*sql.DB
-}
-
 func TestMain(m *testing.M) {
 	if err := godotenv.Load("config.env"); err != nil {
 		log.Fatal(err)
@@ -56,7 +53,7 @@ func TestMain(m *testing.M) {
 	}
 
 	fixture, err := NewLocalTestFixture(
-		"./docker-compose.yml",
+		"docker-compose.yml",
 		WithWaitDBFunc("tql-postgres", dbConnStringPG, "postgres", 5432),
 		WithWaitDBFunc("tql-cockroachdb", dbConnStringCockroachDB, "postgres", 26257),
 		WithWaitDBFunc("tql-mariadb", dbConnStringMariaDB, "mysql", 3306),
@@ -65,8 +62,10 @@ func TestMain(m *testing.M) {
 		log.Fatal(err)
 	}
 
-	if err := fixture.Start(); err != nil {
-		if err := fixture.Stop(); err != nil {
+	ctx := context.Background()
+
+	if err := fixture.Start(ctx); err != nil {
+		if err := fixture.Stop(ctx); err != nil {
 			log.Println(err)
 		}
 
@@ -74,7 +73,7 @@ func TestMain(m *testing.M) {
 	}
 
 	defer func() {
-		if err := fixture.Stop(); err != nil {
+		if err := fixture.Stop(ctx); err != nil {
 			log.Fatal(err)
 		}
 	}()
@@ -131,30 +130,6 @@ func TestMain(m *testing.M) {
 		}
 	}
 
-	//if _, err := pqDB.Exec("CREATE TABLE IF NOT EXISTS test (id text, nullable text);"); err != nil {
-	//	log.Fatal(err)
-	//}
-	//
-	//if _, err := pgxDB.Exec("CREATE TABLE IF NOT EXISTS test (id text, nullable text);"); err != nil {
-	//	log.Fatal(err)
-	//}
-	//
-	//if _, err := cockroachPqDB.Exec("CREATE TABLE IF NOT EXISTS test (id text, nullable text);"); err != nil {
-	//	log.Fatal(err)
-	//}
-	//
-	//if _, err := cockroachPgxDB.Exec("CREATE TABLE IF NOT EXISTS test (id text, nullable text);"); err != nil {
-	//	log.Fatal(err)
-	//}
-	//
-	//if _, err := mariaDB.Exec("CREATE TABLE IF NOT EXISTS test (id text, nullable text);"); err != nil {
-	//	log.Fatal(err)
-	//}
-	//
-	//if _, err := sqlite3DB.Exec("CREATE TABLE IF NOT EXISTS test (id text, nullable text);"); err != nil {
-	//	log.Fatal(err)
-	//}
-
 	_ = m.Run()
 
 	if err := recover(); err != nil {
@@ -167,31 +142,7 @@ func TestMain(m *testing.M) {
 		}
 	}
 
-	//if _, err := pqDB.Exec("DROP TABLE IF EXISTS test;"); err != nil {
-	//	log.Println(err)
-	//}
-	//
-	//if _, err := pgxDB.Exec("DROP TABLE IF EXISTS test;"); err != nil {
-	//	log.Println(err)
-	//}
-	//
-	//if _, err := cockroachPqDB.Exec("DROP TABLE IF EXISTS test;"); err != nil {
-	//	log.Println(err)
-	//}
-	//
-	//if _, err := cockroachPgxDB.Exec("DROP TABLE IF EXISTS test;"); err != nil {
-	//	log.Println(err)
-	//}
-	//
-	//if _, err := mariaDB.Exec("DROP TABLE test;"); err != nil {
-	//	log.Println(err)
-	//}
-	//
-	//if _, err := sqlite3DB.Exec("DROP TABLE test;"); err != nil {
-	//	log.Println(err)
-	//}
-
-	if err := fixture.Stop(); err != nil {
+	if err := fixture.Stop(ctx); err != nil {
 		log.Fatal(err)
 	}
 }
