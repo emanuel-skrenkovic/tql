@@ -2,17 +2,18 @@ package main
 
 import (
 	"fmt"
-	"github.com/docker/go-connections/nat"
-	"github.com/google/uuid"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
 	"log"
 	"os"
+
+	"github.com/docker/go-connections/nat"
+	"github.com/google/uuid"
+	tc "github.com/testcontainers/testcontainers-go/modules/compose"
+	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 type LocalTestFixture struct {
 	dockerComposePath string
-	compose           testcontainers.DockerCompose
+	compose           tc.DockerCompose
 	waitParams        map[string]waitParams
 }
 
@@ -37,7 +38,7 @@ func WithWaitDBFunc(serviceName, connectionString, driver string, port int) Test
 }
 
 func NewLocalTestFixture(dockerComposePath string, opts ...TestFixtureOpt) (LocalTestFixture, error) {
-	compose := testcontainers.NewLocalDockerCompose(
+	compose := tc.NewLocalDockerCompose(
 		[]string{dockerComposePath},
 		uuid.New().String(),
 	)
@@ -53,10 +54,12 @@ func NewLocalTestFixture(dockerComposePath string, opts ...TestFixtureOpt) (Loca
 
 	for serviceName := range compose.Services {
 		if params, ok := fixture.waitParams[serviceName]; ok {
+			p := fmt.Sprintf("%d", params.port)
+
 			compose.WithExposedService(
 				serviceName,
 				params.port,
-				wait.ForSQL(nat.Port(fmt.Sprintf("%d", params.port)), params.driver, func(nat.Port) string {
+				wait.ForSQL(nat.Port(p), params.driver, func(string, nat.Port) string {
 					return params.connectionString
 				}),
 			)
