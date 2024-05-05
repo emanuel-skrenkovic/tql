@@ -9,7 +9,7 @@ import (
 
 type dummyDriver struct{}
 
-func (d dummyDriver) Open(name string) (driver.Conn, error) {
+func (d dummyDriver) Open(string) (driver.Conn, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
