@@ -54,8 +54,9 @@ type Querier interface {
 // If the query returns no results, this function return the provided default.
 //
 // If the query returns a single result, this function returns the result.
-func QuerySingleOrDefault[T any](ctx context.Context, q Querier, def T, query string, params ...any) (result T, err error) {
-	result, err = QuerySingle[T](ctx, q, query, params...)
+func QuerySingleOrDefault[T any](ctx context.Context, q Querier, def T, query string, params ...any) (T, error) {
+	var result T
+	result, err := QuerySingle[T](ctx, q, query, params...)
 	switch {
 	case err != nil && errors.Is(err, sql.ErrNoRows):
 		return def, nil
@@ -93,8 +94,9 @@ func QuerySingle[T any](ctx context.Context, q Querier, query string, params ...
 	return results[0], err
 }
 
-func QueryFirstOrDefault[T any](ctx context.Context, q Querier, def T, query string, params ...any) (result T, err error) {
-	result, err = QueryFirst[T](ctx, q, query, params...)
+func QueryFirstOrDefault[T any](ctx context.Context, q Querier, def T, query string, params ...any) (T, error) {
+	var result T
+	result, err := QueryFirst[T](ctx, q, query, params...)
 	switch {
 	case err != nil && errors.Is(err, sql.ErrNoRows):
 		return def, nil
@@ -108,7 +110,8 @@ func QueryFirstOrDefault[T any](ctx context.Context, q Querier, def T, query str
 // QueryFirst
 // Queries the table and returns the first result. If the query returns no results,
 // the function returns sql.ErrNoRows.
-func QueryFirst[T any](ctx context.Context, q Querier, query string, params ...any) (result T, err error) {
+func QueryFirst[T any](ctx context.Context, q Querier, query string, params ...any) (T, error) {
+	var result T
 	parameterisedQuery, args, err := translateParams(query, params...)
 	if err != nil {
 		return result, err
@@ -184,9 +187,9 @@ func QueryFirst[T any](ctx context.Context, q Querier, query string, params ...a
 // Query
 // Queries the database and returns all the results as a slice. If the query returns no results,
 // an empty slice of type T is returned. This matches the sql.QueryContext function from database/sql.
-func Query[T any](ctx context.Context, q Querier, query string, params ...any) (result []T, err error) {
+func Query[T any](ctx context.Context, q Querier, query string, params ...any) ([]T, error) {
 	// TODO: think about returning sql.ErrNoRows if no results are found.
-	result = make([]T, 0)
+	result := make([]T, 0, 256)
 
 	parameterisedQuery, args, err := translateParams(query, params...)
 	if err != nil {
@@ -293,7 +296,10 @@ ParamLoop:
 		switch val.Kind() {
 		case reflect.Map:
 			value := reflect.Indirect(val).Interface()
-			m := value.(map[string]any)
+			m, ok := value.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("invalid type %T, expected map[string]any", value)
+			}
 
 			for k, v := range m {
 				if _, exists := parameters[k]; exists {
@@ -307,22 +313,22 @@ ParamLoop:
 			valueType := reflect.TypeOf(p)
 			typeName := typeName(valueType)
 
-			fieldTags, found := typeFieldDbTags[typeName]
+			fieldTags, found := typeFieldDBTags[typeName]
 			if !found {
 				fieldsCount := valueType.NumField()
 
 				fieldTags = make([]string, fieldsCount)
 				exportedFieldIndices := make([]int, 0, fieldsCount)
 
-				for i := 0; i < fieldsCount; i++ {
+				for i := range fieldsCount {
 					field := valueType.Field(i)
 
 					if !field.IsExported() {
 						continue ParamLoop
 					}
 
-					tag, found := field.Tag.Lookup("db")
-					if !found {
+					tag, foundTag := field.Tag.Lookup("db")
+					if !foundTag {
 						return nil, fmt.Errorf("field %s is not tagged with 'db' tag", field.Name)
 					}
 
@@ -338,6 +344,7 @@ ParamLoop:
 				field := value.Field(i)
 				parameters[fieldTags[i]] = field.Interface()
 			}
+		default: // no-op
 		}
 	}
 
@@ -461,7 +468,7 @@ func parameteriseQuery(
 				result.WriteRune(positionalParamIndicator)
 			case "postgres", "pgx":
 				result.WriteRune(positionalParamIndicator)
-				result.Write([]byte(strconv.Itoa(currentNum)))
+				result.WriteString(strconv.FormatInt(int64(currentNum), 10))
 			}
 			result.WriteRune(c)
 			continue
@@ -493,11 +500,11 @@ func createDestinations(source any, columns []string) ([]any, error) {
 		numFields := valueType.NumField()
 		indices = make(map[string]int, numFields)
 
-		for i := 0; i < numFields; i++ {
+		for i := range numFields {
 			field := valueType.Field(i)
 
-			tag, found := field.Tag.Lookup("db")
-			if !found {
+			tag, foundTag := field.Tag.Lookup("db")
+			if !foundTag {
 				continue
 			}
 
@@ -509,8 +516,8 @@ func createDestinations(source any, columns []string) ([]any, error) {
 
 	dest := make([]any, len(columns))
 	for i, c := range columns {
-		fieldIdx, found := indices[c]
-		if !found {
+		fieldIdx, foundField := indices[c]
+		if !foundField {
 			return nil, fmt.Errorf("no matching field found for column: %s", c)
 		}
 
@@ -526,13 +533,13 @@ func createDestinations(source any, columns []string) ([]any, error) {
 	return dest, nil
 }
 
-// typeFieldDbTags
+// typeFieldDBTags
 //
 // Acts as a cache for struct field 'db' tag names.
 // Used as such:
 //
-// tagName := typeFieldDbTags[typeName][fieldNumber]
-var typeFieldDbTags = make(map[string][]string)
+// tagName := typeFieldDBTags[typeName][fieldNumber]
+var typeFieldDBTags = make(map[string][]string)
 var typeExportedFieldIndices = make(map[string][]int)
 
 func bindArgs(params ...any) (map[string]any, error) {
@@ -544,7 +551,10 @@ func bindArgs(params ...any) (map[string]any, error) {
 		switch val.Kind() {
 		case reflect.Map:
 			value := reflect.Indirect(val).Interface()
-			m := value.(map[string]any)
+			m, ok := value.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("bindArgs is not of type map[string]any")
+			}
 
 			for k, v := range m {
 				if _, exists := parameters[k]; exists {
@@ -562,15 +572,15 @@ func bindArgs(params ...any) (map[string]any, error) {
 			typeName := typeName(valueType)
 			fieldsCount := valueType.NumField()
 
-			fieldTags, found := typeFieldDbTags[typeName]
+			fieldTags, found := typeFieldDBTags[typeName]
 			if !found {
 				fieldTags = make([]string, fieldsCount)
-				typeFieldDbTags[typeName] = fieldTags
+				typeFieldDBTags[typeName] = fieldTags
 
-				for i := 0; i < fieldsCount; i++ {
+				for i := range fieldsCount {
 					field := valueType.Field(i)
-					tag, found := field.Tag.Lookup("db")
-					if !found {
+					tag, foundTag := field.Tag.Lookup("db")
+					if !foundTag {
 						return nil, fmt.Errorf("field %s is not tagged with 'db' tag", field.Name)
 					}
 
@@ -578,9 +588,10 @@ func bindArgs(params ...any) (map[string]any, error) {
 				}
 			}
 
-			for i := 0; i < fieldsCount; i++ {
+			for i := range fieldsCount {
 				parameters[fieldTags[i]] = value.Field(i).Interface()
 			}
+		default: // no-op
 		}
 	}
 
