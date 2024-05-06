@@ -77,12 +77,7 @@ func (f *LocalTestFixture) Start(ctx context.Context) error {
 		return nil
 	}
 
-	execErr := f.compose.Up(ctx)
-	if execErr != nil {
-		return execErr
-	}
-
-	return execErr
+	return f.compose.Up(ctx)
 }
 
 func (f *LocalTestFixture) Stop(ctx context.Context) error {
