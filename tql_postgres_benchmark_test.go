@@ -20,7 +20,7 @@ func Benchmark_Postgres_ParameteriseQuery(b *testing.B) {
 	args, _ := bindArgs(am)
 	const query = "INSERT INTO foo (a, b, c, d) VALUES (:name, :age, :first, :last)"
 	b.StartTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_, _, _ = parameteriseQuery(n, p, query, args)
 	}
 }
@@ -36,7 +36,7 @@ func Benchmark_Postgres_bindArgs_Struct(b *testing.B) {
 	am := t{"Emanuel Skrenkovic", 30, "Emanuel", "Skrenkovic"}
 
 	b.StartTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_, _ = bindArgs(am)
 	}
 }
@@ -58,7 +58,7 @@ func Benchmark_Postgres_createDestinations(b *testing.B) {
 	am := t{"Emanuel Skrenkovic", 30, "Emanuel", "Skrenkovic"}
 
 	b.StartTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_, _ = createDestinations(&am, cols)
 	}
 }
@@ -73,7 +73,7 @@ func Benchmark_Postgres_mapParameters_Struct(b *testing.B) {
 	}
 	am := t{"Emanuel Skrenkovic", 30, "Emanuel", "Skrenkovic"}
 	b.StartTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_, _ = mapParameters(am)
 	}
 }
@@ -87,7 +87,7 @@ func Benchmark_Postgres_mapParameters_Map(b *testing.B) {
 		"last":  "Skrenkovic",
 	}
 	b.StartTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_, _ = mapParameters(am)
 	}
 }
